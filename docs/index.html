@@ -3,793 +3,328 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="浮光世界观编辑器 - 为小说作者、游戏策划、TRPG 主持人打造的世界观管理工具。集实体库、关系图、时间线、视觉物料生成与 AI 辅助于一体。">
-  <title>浮光世界观编辑器 - 为创作者打造的世界观管理工具</title>
+  <meta name="description" content="浮光世界观编辑器 - 为小说作者、游戏策划、TRPG 主持人打造的世界观管理工具。">
+  <title>浮光 — 为讲故事的人，做一个值得托付的工具</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     :root {
-      --bg-primary: #0a0a0c;
-      --bg-secondary: #121218;
-      --bg-card: #181820;
-      --bg-card-hover: #20202a;
-      --text-primary: #f5f3ef;
-      --text-secondary: #b8b3a8;
-      --text-muted: #7a7569;
-      --accent: #d4a853;
-      --accent-hover: #e4bc6a;
-      --accent-dim: rgba(212, 168, 83, 0.12);
-      --border: rgba(255, 255, 255, 0.08);
-      --radius: 14px;
-      --radius-sm: 8px;
-      --shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-      --max-width: 1120px;
+      --paper: #f5efe4;
+      --paper-2: #ebe2d0;
+      --ink: #1a1612;
+      --ink-2: #4a4036;
+      --ink-3: #8a7d6d;
+      --accent: #b8533e;
+      --accent-2: #c87f5a;
+      --line: #d9cfb8;
+      --max: 1200px;
     }
-
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg-primary: #f7f5f0;
-        --bg-secondary: #ffffff;
-        --bg-card: #ffffff;
-        --bg-card-hover: #f9f7f2;
-        --text-primary: #1a1917;
-        --text-secondary: #5a5854;
-        --text-muted: #8a867c;
-        --accent: #b8892f;
-        --accent-hover: #9e701f;
-        --accent-dim: rgba(184, 137, 47, 0.1);
-        --border: rgba(0, 0, 0, 0.08);
-        --shadow: 0 24px 80px rgba(0, 0, 0, 0.12);
-      }
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.7;
-      overflow-x: hidden;
+      font-family: Georgia, "Source Serif Pro", "Songti SC", "STSong", serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(26,22,18,0.04) 1px, transparent 0);
+      background-size: 24px 24px;
     }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: var(--max); margin: 0 auto; padding: 0 40px; }
+    .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
 
-    a {
-      color: var(--accent);
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
+    /* Top bar — minimal, like a magazine masthead */
+    .topbar { padding: 24px 0; border-bottom: 1px solid var(--line); }
+    .topbar .container { display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 13px; letter-spacing: 0.05em; }
+    .topbar .left { display: flex; align-items: center; gap: 12px; }
+    .topbar img { width: 28px; height: 28px; border-radius: 4px; }
+    .topbar .vol { color: var(--ink-3); }
+    .topbar nav { display: flex; gap: 28px; text-transform: uppercase; }
+    .topbar nav a:hover { color: var(--accent); }
 
-    a:hover {
-      color: var(--accent-hover);
-    }
+    /* Hero — magazine cover style */
+    .hero { padding: 80px 0 100px; border-bottom: 2px solid var(--ink); position: relative; }
+    .hero .issue { font-family: -apple-system, sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 32px; display: flex; align-items: center; gap: 16px; }
+    .hero .issue::after { content: ""; flex: 1; height: 1px; background: var(--ink-3); }
+    .hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px; align-items: end; }
+    .hero h1 { font-family: Georgia, "Source Serif Pro", "Songti SC", serif; font-size: clamp(48px, 8vw, 96px); font-weight: 400; line-height: 1; letter-spacing: -0.025em; margin-bottom: 24px; }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero .kicker { font-family: -apple-system, sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 20px; font-weight: 600; }
+    .hero .deck { font-size: clamp(18px, 1.8vw, 22px); color: var(--ink-2); font-style: italic; line-height: 1.5; max-width: 520px; margin-bottom: 40px; }
+    .hero .note { font-family: -apple-system, sans-serif; font-size: 12px; color: var(--ink-3); line-height: 1.6; max-width: 520px; margin-top: -28px; margin-bottom: 40px; font-style: italic; }
+    .hero-meta { display: flex; gap: 32px; font-family: -apple-system, sans-serif; font-size: 13px; color: var(--ink-3); }
+    .hero-meta strong { color: var(--ink); display: block; font-size: 16px; margin-bottom: 2px; font-weight: 500; }
+    .hero-cta { margin-top: 40px; display: flex; gap: 20px; align-items: center; font-family: -apple-system, sans-serif; }
+    .hero-cta a:first-child { padding: 14px 28px; background: var(--ink); color: var(--paper); border-radius: 0; font-weight: 500; font-size: 14px; letter-spacing: 0.05em; transition: all 0.2s; }
+    .hero-cta a:first-child:hover { background: var(--accent); }
+    .hero-cta a:last-child { font-size: 14px; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+    .hero-cta a:last-child:hover { color: var(--accent); border-color: var(--accent); }
+    .hero-side { text-align: right; }
+    .hero-side img { width: 100%; max-width: 280px; border-radius: 50%; border: 1px solid var(--line); box-shadow: 0 30px 60px rgba(26,22,18,0.15); }
+    .hero-side figcaption { font-family: -apple-system, sans-serif; font-size: 11px; color: var(--ink-3); margin-top: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
 
-    .container {
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+    /* Pull quote */
+    .pullquote { padding: 80px 0; text-align: center; border-bottom: 1px solid var(--line); position: relative; }
+    .pullquote blockquote { font-size: clamp(24px, 3.5vw, 38px); line-height: 1.35; font-style: italic; max-width: 800px; margin: 0 auto; }
+    .pullquote blockquote::before, .pullquote blockquote::after { content: ""; display: block; width: 40px; height: 1px; background: var(--ink); margin: 24px auto; }
+    .pullquote cite { display: block; margin-top: 16px; font-family: -apple-system, sans-serif; font-style: normal; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
 
-    /* Stars background */
-    .stars {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.6;
-    }
+    /* Sections — chapter-style */
+    section { padding: 100px 0; border-bottom: 1px solid var(--line); position: relative; }
+    .chapter-head { display: grid; grid-template-columns: 80px 1fr; gap: 40px; align-items: baseline; margin-bottom: 64px; }
+    .chapter-head .ch-num { font-family: Georgia, serif; font-size: 60px; font-style: italic; color: var(--accent); line-height: 1; font-weight: 400; }
+    .chapter-head h2 { font-family: Georgia, "Songti SC", serif; font-size: clamp(32px, 4.5vw, 52px); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; }
+    .chapter-head .deck { font-family: -apple-system, sans-serif; font-size: 14px; color: var(--ink-3); margin-top: 12px; letter-spacing: 0.05em; }
 
-    .star {
-      position: absolute;
-      background: var(--accent);
-      border-radius: 50%;
-      animation: twinkle 4s infinite ease-in-out;
-    }
+    /* Feature list — newspaper-style columns */
+    .features-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
+    .feature { padding: 32px 28px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .feature:last-child { border-right: none; }
+    .feature:nth-child(3n) { border-right: none; }
+    .feature:nth-last-child(-n+3) { border-bottom: none; }
+    .feature .num { font-family: Georgia, serif; font-style: italic; color: var(--accent); font-size: 14px; margin-bottom: 12px; }
+    .feature h3 { font-family: Georgia, serif; font-size: 22px; font-weight: 400; margin-bottom: 12px; line-height: 1.3; }
+    .feature p { color: var(--ink-2); font-size: 14px; line-height: 1.7; font-family: -apple-system, "PingFang SC", sans-serif; }
 
-    @keyframes twinkle {
-      0%, 100% { opacity: 0.15; }
-      50% { opacity: 0.6; }
+    /* Forge — editorial spread */
+    .forge-spread { display: grid; grid-template-columns: 5fr 4fr; gap: 80px; align-items: start; padding-top: 32px; border-top: 1px solid var(--line); }
+    .forge-spread h3 { font-family: Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.3; margin-bottom: 24px; }
+    .forge-spread .lede { font-size: 17px; line-height: 1.8; color: var(--ink-2); margin-bottom: 24px; }
+    .forge-spread .lede::first-letter { font-family: Georgia, serif; font-size: 60px; float: left; line-height: 0.9; margin-right: 8px; margin-top: 6px; color: var(--accent); font-weight: 400; }
+    .forge-spread ul { list-style: none; columns: 2; column-gap: 24px; margin-top: 32px; }
+    .forge-spread li { padding: 8px 0; border-bottom: 1px dotted var(--line); font-family: -apple-system, sans-serif; font-size: 14px; display: flex; align-items: center; gap: 8px; break-inside: avoid; }
+    .forge-spread li::before { content: "✦"; color: var(--accent); font-size: 12px; }
+    .card-art {
+      border: 1px solid var(--line); background: white;
+      aspect-ratio: 3/4; padding: 36px;
+      display: flex; flex-direction: column; align-items: center;
+      box-shadow: 0 30px 60px rgba(26,22,18,0.12);
+      position: relative; overflow: hidden;
     }
+    .card-art::before {
+      content: "FUGUANG"; position: absolute; font-size: 80px; font-weight: 700;
+      color: rgba(184, 83, 62, 0.06); transform: rotate(-12deg); top: 38%; left: -8%;
+      font-family: Georgia, serif;
+    }
+    .card-art .corner { position: absolute; top: 12px; left: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
+    .card-art .corner-r { position: absolute; top: 12px; right: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
+    .card-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); margin-bottom: 20px; box-shadow: 0 12px 32px rgba(184, 83, 62, 0.25); margin-top: 24px; }
+    .card-name { font-family: Georgia, serif; font-size: 22px; margin-bottom: 4px; }
+    .card-role { font-size: 12px; color: var(--ink-3); font-family: -apple-system, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 32px; }
+    .card-row { width: 100%; display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-family: -apple-system, sans-serif; font-size: 12px; }
+    .card-row span:first-child { color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
 
-    @media (prefers-color-scheme: light) {
-      .stars { opacity: 0.25; }
-      .star { background: var(--text-muted); }
-    }
-
-    /* Header */
-    header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      backdrop-filter: blur(12px);
-      background: rgba(var(--bg-primary), 0.8);
-      border-bottom: 1px solid var(--border);
-      transition: background 0.3s ease;
-    }
-
-    header .container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 64px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .brand img {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-    }
-
-    nav {
-      display: flex;
-      gap: 28px;
-      align-items: center;
-    }
-
-    nav a {
-      font-size: 14px;
-      color: var(--text-secondary);
-    }
-
-    nav a:hover {
-      color: var(--text-primary);
-    }
-
-    .github-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: var(--radius-sm);
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      font-size: 14px;
-      color: var(--text-primary);
-    }
-
-    .github-link:hover {
-      background: var(--bg-card-hover);
-      color: var(--text-primary);
-    }
-
-    /* Hero */
-    .hero {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
-    }
-
-    .hero-content {
-      max-width: 760px;
-    }
-
-    .hero-logo {
-      width: 120px;
-      height: 120px;
-      border-radius: 28px;
-      margin: 0 auto 32px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    }
-
-    .version {
-      display: inline-block;
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: var(--accent-dim);
-      border: 1px solid rgba(212, 168, 83, 0.2);
-      color: var(--accent);
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 24px;
-    }
-
-    h1 {
-      font-size: clamp(36px, 6vw, 60px);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -0.02em;
-      margin-bottom: 20px;
-    }
-
-    .hero p {
-      font-size: clamp(17px, 2.4vw, 21px);
-      color: var(--text-secondary);
-      margin-bottom: 40px;
-      max-width: 620px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .hero-buttons {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 28px;
-      border-radius: var(--radius-sm);
-      font-size: 15px;
-      font-weight: 600;
-      transition: all 0.2s ease;
-      cursor: pointer;
-      border: none;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #0a0a0c;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-hover);
-      color: #0a0a0c;
-      transform: translateY(-1px);
-    }
-
-    .btn-secondary {
-      background: var(--bg-card);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-
-    .btn-secondary:hover {
-      background: var(--bg-card-hover);
-      color: var(--text-primary);
-      transform: translateY(-1px);
-    }
-
-    /* Sections */
-    section {
-      position: relative;
-      z-index: 1;
-      padding: 100px 0;
-    }
-
-    .section-alt {
-      background: var(--bg-secondary);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .section-title {
-      text-align: center;
-      margin-bottom: 64px;
-    }
-
-    .section-title h2 {
-      font-size: clamp(28px, 4vw, 40px);
-      font-weight: 700;
-      margin-bottom: 16px;
-    }
-
-    .section-title p {
-      color: var(--text-secondary);
-      font-size: 18px;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-    /* Feature cards */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-    }
-
-    .feature-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 32px;
-      transition: all 0.3s ease;
-    }
-
-    .feature-card:hover {
-      background: var(--bg-card-hover);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow);
-    }
-
-    .feature-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: var(--accent-dim);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      color: var(--accent);
-    }
-
-    .feature-card h3 {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-
-    .feature-card p {
-      color: var(--text-secondary);
-      font-size: 15px;
-      line-height: 1.7;
-    }
-
-    /* MaterialForge highlight */
-    .forge-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 64px;
-      align-items: center;
-    }
-
-    .forge-content h2 {
-      font-size: clamp(26px, 3.5vw, 36px);
-      font-weight: 700;
-      margin-bottom: 20px;
-    }
-
-    .forge-content p {
-      color: var(--text-secondary);
-      font-size: 16px;
-      margin-bottom: 16px;
-    }
-
-    .forge-list {
-      list-style: none;
-      margin: 24px 0;
-    }
-
-    .forge-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 12px;
-      color: var(--text-secondary);
-    }
-
-    .forge-list li::before {
-      content: "✦";
-      color: var(--accent);
-      flex-shrink: 0;
-    }
-
-    .card-preview {
-      position: relative;
-      background: #f5f0e6;
-      border-radius: var(--radius);
-      padding: 28px;
-      box-shadow: var(--shadow);
-      min-height: 360px;
-      display: flex;
-      flex-direction: column;
-      color: #2a2825;
-      overflow: hidden;
-    }
-
-    .card-header {
-      background: #8b4513;
-      color: white;
-      padding: 10px 16px;
-      border-radius: 8px;
-      font-weight: 600;
-      margin-bottom: 20px;
-    }
-
-    .card-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(0,0,0,0.08);
-      font-size: 14px;
-    }
-
-    .card-avatar {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #d4a853 0%, #8b4513 100%);
-      margin: 16px auto;
-      box-shadow: 0 8px 24px rgba(139, 69, 19, 0.2);
-    }
-
-    .card-watermark {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-24deg);
-      font-size: 64px;
-      font-weight: 700;
-      color: rgba(139, 69, 19, 0.05);
-      white-space: nowrap;
-      pointer-events: none;
-    }
-
-    @media (max-width: 860px) {
-      .forge-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Tech stack */
-    .tech-badges {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 10px 18px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-secondary);
-    }
-
-    .badge svg {
-      width: 18px;
-      height: 18px;
-      margin-right: 8px;
-    }
-
-    /* Download */
-    .download-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .download-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 36px;
-      text-align: center;
-      transition: all 0.3s ease;
-    }
-
-    .download-card:hover {
-      box-shadow: var(--shadow);
-      transform: translateY(-4px);
-    }
-
-    .download-card .platform-icon {
-      width: 56px;
-      height: 56px;
-      margin: 0 auto 20px;
-      background: var(--accent-dim);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
-    }
-
-    .download-card h3 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .download-card p {
-      color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 24px;
-    }
-
-    .download-card .btn {
-      width: 100%;
-      justify-content: center;
-    }
+    /* Download — letter style */
+    .download-block { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .download-block h3 { font-family: Georgia, serif; font-size: 36px; font-weight: 400; line-height: 1.3; margin-bottom: 16px; }
+    .download-block p { color: var(--ink-2); font-size: 16px; margin-bottom: 32px; }
+    .download-block .letter { font-family: -apple-system, sans-serif; }
+    .download-block .letter a { display: block; padding: 20px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
+    .download-block .letter a:hover { padding-left: 12px; color: var(--accent); }
+    .download-block .letter strong { font-size: 18px; font-weight: 500; }
+    .download-block .letter small { color: var(--ink-3); font-size: 13px; display: block; margin-top: 4px; }
+    .download-block .letter .arrow { font-family: Georgia, serif; font-size: 24px; }
 
     /* Footer */
-    footer {
-      position: relative;
-      z-index: 1;
-      border-top: 1px solid var(--border);
-      padding: 48px 0;
-      background: var(--bg-secondary);
-      text-align: center;
-    }
-
-    footer p {
-      color: var(--text-muted);
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-
-    footer .links {
-      display: flex;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 20px;
-    }
-
-    footer .links a {
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    footer .links a:hover {
-      color: var(--accent);
-    }
-
-    /* Reveal animation */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    footer { padding: 60px 0; }
+    footer .container { display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, sans-serif; font-size: 13px; color: var(--ink-3); }
+    footer .links { display: flex; gap: 24px; }
 
     @media (max-width: 720px) {
-      header nav { display: none; }
-      .hero { padding-top: 100px; }
-      .hero-logo { width: 96px; height: 96px; }
-      section { padding: 72px 0; }
+      .container { padding: 0 24px; }
+      .hero-grid, .forge-spread, .download-block { grid-template-columns: 1fr; gap: 32px; }
+      .hero-side { text-align: center; }
+      .features-list { grid-template-columns: 1fr; }
+      .feature { border-right: none !important; }
+      .chapter-head { grid-template-columns: 1fr; gap: 8px; }
+      .chapter-head .ch-num { font-size: 40px; }
+      footer .container { flex-direction: column; gap: 16px; }
+      .topbar nav { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="stars" id="stars"></div>
-
-  <header>
+  <div class="topbar">
     <div class="container">
-      <a href="#" class="brand">
-        <img src="logo-128.png" alt="浮光世界观编辑器">
-        <span>浮光世界观编辑器</span>
-      </a>
+      <div class="left">
+        <img src="logo-128.png" alt="浮光">
+        <span><strong>浮光</strong> · 世界观编辑器</span>
+      </div>
+      <span class="vol">Vol. 2 · Issue 8</span>
       <nav>
         <a href="#features">功能</a>
-        <a href="#materialforge">物料生成</a>
+        <a href="#forge">物料生成</a>
         <a href="#download">下载</a>
-        <a href="https://github.com/Reflaction-del/Project_Floatlight" class="github-link" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-          GitHub
-        </a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub</a>
       </nav>
     </div>
-  </header>
+  </div>
 
   <section class="hero">
-    <div class="hero-content">
-      <img src="logo.png" alt="浮光世界观编辑器" class="hero-logo">
-      <div class="version">v2.2.8</div>
-      <h1>让世界观的每一处细节，都有据可循</h1>
-      <p>为小说作者、游戏策划、TRPG 主持人打造的世界观管理工具。集实体库、关系图、时间线、视觉物料生成与 AI 辅助于一体。</p>
-      <div class="hero-buttons">
-        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" class="btn btn-primary" target="_blank" rel="noopener">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 17h-4v-2h4v2zm-7-4v6h-2v-6h2zm7-8v2H4V5h16zM4 19h16v2H4v-2zm13-8h3v2h-3v-2zM4 11h3v2H4v-2zm5 0h3v2H9v-2z"/></svg>
-          下载 Windows 版
-        </a>
-        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" class="btn btn-secondary" target="_blank" rel="noopener">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0225 3.503C15.5902 8.479 13.853 8.208 12 8.208c-1.853 0-3.5902.271-4.1367.3845L5.8408 5.0893a.4161.4161 0 00-.5677-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589.3432 18.6617h23.3136c0-4.0028-2.3457-7.475-5.775-9.3403"/></svg>
-          下载 Android 版
-        </a>
+    <div class="container">
+      <div class="issue">本期专题 — 为讲故事的人做一个工具</div>
+      <div class="hero-grid">
+        <div>
+          <div class="kicker">A Tool for Worldbuilders</div>
+          <h1>让世界观的<br>每一处<em>细节</em>，<br>都有据可循。</h1>
+          <p class="deck">一份面向小说作者、游戏策划、TRPG 主持人的世界观管理工具。把零散的灵感，整合成可用的产出物。</p>
+          <p class="note">本介绍页及程序本体的需求分析、功能设计、实现路径规划全部由生成式模型完成。</p>
+          <div class="hero-meta sans">
+            <div><strong>6+</strong>核心模块</div>
+            <div><strong>3</strong>平台覆盖</div>
+            <div><strong>MIT</strong>开源协议</div>
+          </div>
+          <div class="hero-cta">
+            <a href="https://github.com/Reflaction-del/Project_Floatlight/releases">免费下载</a>
+            <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">在 GitHub 查看</a>
+          </div>
+        </div>
+        <div class="hero-side">
+          <img src="logo.png" alt="浮光">
+          <figcaption>— 浮光，Fuguang</figcaption>
+        </div>
       </div>
     </div>
   </section>
 
-  <section id="features" class="section-alt">
+  <div class="pullquote">
     <div class="container">
-      <div class="section-title reveal">
-        <h2>一站式世界观构建</h2>
-        <p>从灵感到产出，浮光为你的创作流程提供完整支持</p>
+      <blockquote>
+        世界观不是设定清单，<br>
+        是一张活的网。
+      </blockquote>
+      <cite>— 编辑寄语</cite>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="container">
+      <div class="chapter-head">
+        <div class="ch-num">I</div>
+        <div>
+          <h2>一个工具，覆盖整个创作链路。</h2>
+          <div class="deck sans">From spark to artifact — six modules, one shared dataset.</div>
+        </div>
       </div>
-      <div class="features-grid">
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          </div>
-          <h3>三栏式布局</h3>
-          <p>工具栏、文件树、主工作区、赋能侧栏自由组合，像整理笔记一样管理整个世界。</p>
-        </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          </div>
+      <div class="features-list">
+        <div class="feature">
+          <div class="num">No. 01</div>
           <h3>实体库</h3>
-          <p>角色、地点、组织、概念、文档，自定义类型与字段，把设定整理得井井有条。</p>
+          <p>角色、地点、组织、概念、文档，自定义类型与字段，让每个设定都有自己的位置。</p>
         </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="4"></circle><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"></line><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line></svg>
-          </div>
+        <div class="feature">
+          <div class="num">No. 02</div>
           <h3>关系图</h3>
           <p>用可视化网络洞察实体之间的关联，复杂关系也能一眼看清。</p>
         </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          </div>
+        <div class="feature">
+          <div class="num">No. 03</div>
           <h3>时间线</h3>
-          <p>多事件编排 + 影响力指数可视化，让历史脉络与关键节点清晰可见。</p>
+          <p>多事件编排与影响力可视化，让历史脉络与关键节点清晰可见。</p>
         </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          </div>
+        <div class="feature">
+          <div class="num">No. 04</div>
           <h3>一致性检查</h3>
           <p>自动发现设定冲突与逻辑漏洞，避免长篇写到一半才发现前后矛盾。</p>
         </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          </div>
+        <div class="feature">
+          <div class="num">No. 05</div>
+          <h3>三栏式布局</h3>
+          <p>工具栏、文件树、工作区、赋能侧栏自由组合，像整理笔记一样管理世界。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 06</div>
           <h3>AI 赋能</h3>
-          <p>内置 OpenAI 兼容接口，文章抽取实体、智能消歧、自然语言生成模板，随叫随到。</p>
+          <p>内置 OpenAI 兼容接口，文章抽取实体、智能消歧、自然语言生成模板。</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="materialforge">
+  <section id="forge">
     <div class="container">
-      <div class="forge-grid">
-        <div class="forge-content reveal">
-          <h2>把世界观数据，变成可用产出物</h2>
-          <p>视觉物料生成器（MaterialForge）是浮光的独特能力：它直接读取你的实体数据、世界风格与模板定义，一键生成角色卡、设定卡、关系图卡等视觉物料。</p>
-          <ul class="forge-list">
-            <li>模板化卡片 + 自由拖拽画布</li>
-            <li>风格系统统一调色板、字体、纹理与水印</li>
-            <li>字段绑定八源解析，自动填充实体内容</li>
-            <li>导出 PNG / PDF / SVG，支持批量套系生成</li>
-            <li>自然语言改风格，AI 辅助生成文案与头像</li>
+      <div class="chapter-head">
+        <div class="ch-num">II</div>
+        <div>
+          <h2>把设定数据，变成可用产出物。</h2>
+          <div class="deck sans">Visual artifacts generated from your world, not from scratch.</div>
+        </div>
+      </div>
+      <div class="forge-spread">
+        <div>
+          <h3>MaterialForge — 一份模板，便是一张卡片。</h3>
+          <p class="lede">视觉物料生成器直接读取你的实体数据、世界风格与模板定义，一键生成角色卡、设定卡、关系图卡等视觉物料。不需要 PS，不需要画师，不需要重新整理格式。绑定实体字段、选择模板风格、按一个键导出。</p>
+          <ul>
+            <li>模板化卡片</li>
+            <li>风格统一调色板</li>
+            <li>字段绑定八源解析</li>
+            <li>字体与纹理管理</li>
+            <li>导出 PNG / PDF / SVG</li>
+            <li>批量套系生成</li>
+            <li>AI 生成文案</li>
+            <li>AI 生成头像</li>
           </ul>
         </div>
-        <div class="card-preview reveal">
-          <div class="card-watermark">FUGUANG</div>
-          <div class="card-header">角色卡 · Character</div>
+        <div class="card-art">
+          <div class="corner">FUGUANG</div>
+          <div class="corner-r">No. 047</div>
           <div class="card-avatar"></div>
-          <div style="text-align:center; font-weight:600; font-size:16px; margin-bottom:4px;">艾尔莎 · 霜语</div>
-          <div style="text-align:center; color:#8b7355; font-size:13px; margin-bottom:20px;">北境守夜人 · 冰法师</div>
-          <div class="card-row"><span>年龄</span><span>24 岁</span></div>
+          <div class="card-name">艾尔莎 · 霜语</div>
+          <div class="card-role">北境守夜人 · 冰法师</div>
+          <div class="card-row"><span>年龄</span><span>24</span></div>
           <div class="card-row"><span>出身</span><span>霜语家族末裔</span></div>
           <div class="card-row"><span>阵营</span><span>守序中立</span></div>
-          <div class="card-row"><span>能力</span><span>冰晶操控 / 预知梦</span></div>
+          <div class="card-row"><span>能力</span><span>冰晶操控</span></div>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section-alt">
-    <div class="container">
-      <div class="section-title reveal">
-        <h2>现代技术栈</h2>
-        <p>桌面端、移动端与浏览器预览共享同一套核心代码</p>
-      </div>
-      <div class="tech-badges reveal">
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Electron 31</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>React 18</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>TypeScript</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>TipTap 2</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Tailwind CSS v4</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Zustand</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Vite 5</span>
-        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Capacitor 8</span>
       </div>
     </div>
   </section>
 
   <section id="download">
     <div class="container">
-      <div class="section-title reveal">
-        <h2>立即开始</h2>
-        <p>选择适合你设备的版本，免费下载使用</p>
-      </div>
-      <div class="download-grid">
-        <div class="download-card reveal">
-          <div class="platform-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          </div>
-          <h3>Windows</h3>
-          <p>安装包与便携版，支持 Windows 10 / 11</p>
-          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" class="btn btn-primary" target="_blank" rel="noopener">下载 Windows 版</a>
-        </div>
-        <div class="download-card reveal">
-          <div class="platform-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0225 3.503C15.5902 8.479 13.853 8.208 12 8.208c-1.853 0-3.5902.271-4.1367.3845L5.8408 5.0893a.4161.4161 0 00-.5677-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589.3432 18.6617h23.3136c0-4.0028-2.3457-7.475-5.775-9.3403"/></svg>
-          </div>
-          <h3>Android</h3>
-          <p>侧载 APK，支持 Android 8.0 及以上</p>
-          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" class="btn btn-secondary" target="_blank" rel="noopener">下载 Android 版</a>
+      <div class="chapter-head">
+        <div class="ch-num">III</div>
+        <div>
+          <h2>免费下载，开箱即用。</h2>
+          <div class="deck sans">No tracking. No watermark. Forever free.</div>
         </div>
       </div>
-      <p style="text-align:center; color:var(--text-muted); margin-top:32px; font-size:14px;">
-        所有下载均来自 GitHub Releases。请根据设备选择安装包或便携版。
-      </p>
+      <div class="download-block">
+        <div>
+          <h3>选择适合你设备的版本。</h3>
+          <p>浮光完全开源，所有功能完整、无水印、无追踪。下载后即可使用，无需注册。</p>
+          <p style="font-style: italic; color: var(--ink-3); font-size: 14px;">— 详情见 GitHub Releases 页面。</p>
+        </div>
+        <div class="letter">
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">
+            <div>
+              <strong>Windows</strong>
+              <small>安装包 + 便携版 · Win 10 / 11</small>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">
+            <div>
+              <strong>Android</strong>
+              <small>侧载 APK · Android 8.0+</small>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+        </div>
+      </div>
     </div>
   </section>
 
   <footer>
     <div class="container">
+      <div>© 2026 浮光 · MIT License · 为讲故事的人打造</div>
       <div class="links">
-        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank" rel="noopener">Releases</a>
-        <a href="https://github.com/Reflaction-del/Project_Floatlight/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">Releases</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/blob/main/LICENSE" target="_blank">License</a>
       </div>
-      <p>浮光世界观编辑器 v2.2.8 — 开源、免费、为创作者打造</p>
-      <p>&copy; 2026 浮光 (Fuguang). 保留所有权利。</p>
     </div>
   </footer>
-
-  <script>
-    // Generate stars
-    const starsContainer = document.getElementById('stars');
-    for (let i = 0; i < 60; i++) {
-      const star = document.createElement('div');
-      star.className = 'star';
-      const size = Math.random() * 2 + 1;
-      star.style.width = size + 'px';
-      star.style.height = size + 'px';
-      star.style.left = Math.random() * 100 + '%';
-      star.style.top = Math.random() * 100 + '%';
-      star.style.animationDelay = Math.random() * 4 + 's';
-      star.style.animationDuration = (Math.random() * 3 + 3) + 's';
-      starsContainer.appendChild(star);
-    }
-
-    // Reveal on scroll
-    const revealElements = document.querySelectorAll('.reveal');
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-        }
-      });
-    }, { threshold: 0.1 });
-
-    revealElements.forEach(el => observer.observe(el));
-
-    // Header background on scroll
-    const header = document.querySelector('header');
-    window.addEventListener('scroll', () => {
-      if (window.scrollY > 20) {
-        header.style.background = 'var(--bg-secondary)';
-        header.style.borderBottomColor = 'var(--border)';
-      } else {
-        header.style.background = 'rgba(var(--bg-primary), 0.8)';
-      }
-    });
-  </script>
 </body>
 </html>
