@@ -10,14 +10,14 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     :root {
-      --paper: #f5efe4;
-      --paper-2: #ebe2d0;
-      --ink: #1a1612;
-      --ink-2: #4a4036;
-      --ink-3: #8a7d6d;
-      --accent: #b8533e;
-      --accent-2: #c87f5a;
-      --line: #d9cfb8;
+      --paper: #0a0a0c;
+      --surface: #131318;
+      --ink: #f5f3ef;
+      --ink-2: #c8c4bc;
+      --ink-3: #7a7569;
+      --accent: #c9a45c;
+      --accent-2: #d4a853;
+      --line: #2a2620;
       --max: 1200px;
     }
     body {
@@ -27,7 +27,7 @@
       line-height: 1.75;
       -webkit-font-smoothing: antialiased;
       background-image:
-        radial-gradient(circle at 1px 1px, rgba(26,22,18,0.04) 1px, transparent 0);
+        radial-gradient(circle at 1px 1px, rgba(245,243,239,0.035) 1px, transparent 0);
       background-size: 24px 24px;
     }
     a { color: inherit; text-decoration: none; }
@@ -44,9 +44,9 @@
     .topbar nav a:hover { color: var(--accent); }
 
     /* Hero — magazine cover style */
-    .hero { padding: 80px 0 100px; border-bottom: 2px solid var(--ink); position: relative; }
+    .hero { padding: 80px 0 100px; border-bottom: 2px solid var(--line); position: relative; }
     .hero .issue { font-family: -apple-system, sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 32px; display: flex; align-items: center; gap: 16px; }
-    .hero .issue::after { content: ""; flex: 1; height: 1px; background: var(--ink-3); }
+    .hero .issue::after { content: ""; flex: 1; height: 1px; background: var(--line); }
     .hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px; align-items: end; }
     .hero h1 { font-family: Georgia, "Source Serif Pro", "Songti SC", serif; font-size: clamp(48px, 8vw, 96px); font-weight: 400; line-height: 1; letter-spacing: -0.025em; margin-bottom: 24px; }
     .hero h1 em { font-style: italic; color: var(--accent); }
@@ -56,18 +56,18 @@
     .hero-meta { display: flex; gap: 32px; font-family: -apple-system, sans-serif; font-size: 13px; color: var(--ink-3); }
     .hero-meta strong { color: var(--ink); display: block; font-size: 16px; margin-bottom: 2px; font-weight: 500; }
     .hero-cta { margin-top: 40px; display: flex; gap: 20px; align-items: center; font-family: -apple-system, sans-serif; }
-    .hero-cta a:first-child { padding: 14px 28px; background: var(--ink); color: var(--paper); border-radius: 0; font-weight: 500; font-size: 14px; letter-spacing: 0.05em; transition: all 0.2s; }
-    .hero-cta a:first-child:hover { background: var(--accent); }
-    .hero-cta a:last-child { font-size: 14px; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+    .hero-cta a:first-child { padding: 14px 28px; background: var(--accent); color: var(--paper); border-radius: 0; font-weight: 500; font-size: 14px; letter-spacing: 0.05em; transition: all 0.2s; }
+    .hero-cta a:first-child:hover { background: var(--accent-2); }
+    .hero-cta a:last-child { font-size: 14px; border-bottom: 1px solid var(--ink-2); padding-bottom: 2px; color: var(--ink-2); }
     .hero-cta a:last-child:hover { color: var(--accent); border-color: var(--accent); }
     .hero-side { text-align: right; }
-    .hero-side img { width: 100%; max-width: 280px; border-radius: 50%; border: 1px solid var(--line); box-shadow: 0 30px 60px rgba(26,22,18,0.15); }
+    .hero-side img { width: 100%; max-width: 280px; border-radius: 50%; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(201,164,92,0.18); }
     .hero-side figcaption { font-family: -apple-system, sans-serif; font-size: 11px; color: var(--ink-3); margin-top: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
 
     /* Pull quote */
     .pullquote { padding: 80px 0; text-align: center; border-bottom: 1px solid var(--line); position: relative; }
     .pullquote blockquote { font-size: clamp(24px, 3.5vw, 38px); line-height: 1.35; font-style: italic; max-width: 800px; margin: 0 auto; }
-    .pullquote blockquote::before, .pullquote blockquote::after { content: ""; display: block; width: 40px; height: 1px; background: var(--ink); margin: 24px auto; }
+    .pullquote blockquote::before, .pullquote blockquote::after { content: ""; display: block; width: 40px; height: 1px; background: var(--accent); margin: 24px auto; }
     .pullquote cite { display: block; margin-top: 16px; font-family: -apple-system, sans-serif; font-style: normal; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
 
     /* Sections — chapter-style */
@@ -96,23 +96,23 @@
     .forge-spread li { padding: 8px 0; border-bottom: 1px dotted var(--line); font-family: -apple-system, sans-serif; font-size: 14px; display: flex; align-items: center; gap: 8px; break-inside: avoid; }
     .forge-spread li::before { content: "✦"; color: var(--accent); font-size: 12px; }
     .card-art {
-      border: 1px solid var(--line); background: white;
+      border: 1px solid var(--line); background: var(--surface);
       aspect-ratio: 3/4; padding: 36px;
       display: flex; flex-direction: column; align-items: center;
-      box-shadow: 0 30px 60px rgba(26,22,18,0.12);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.45);
       position: relative; overflow: hidden;
     }
     .card-art::before {
-      content: "FUGUANG"; position: absolute; font-size: 80px; font-weight: 700;
-      color: rgba(184, 83, 62, 0.06); transform: rotate(-12deg); top: 38%; left: -8%;
+      content: "floatlight"; position: absolute; font-size: 80px; font-weight: 700;
+      color: rgba(201, 164, 92, 0.08); transform: rotate(-12deg); top: 38%; left: -8%;
       font-family: Georgia, serif;
     }
     .card-art .corner { position: absolute; top: 12px; left: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
     .card-art .corner-r { position: absolute; top: 12px; right: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
-    .card-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); margin-bottom: 20px; box-shadow: 0 12px 32px rgba(184, 83, 62, 0.25); margin-top: 24px; }
-    .card-name { font-family: Georgia, serif; font-size: 22px; margin-bottom: 4px; }
+    .card-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); margin-bottom: 20px; box-shadow: 0 12px 32px rgba(201, 164, 92, 0.25); margin-top: 24px; }
+    .card-name { font-family: Georgia, serif; font-size: 22px; margin-bottom: 4px; color: var(--ink); }
     .card-role { font-size: 12px; color: var(--ink-3); font-family: -apple-system, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 32px; }
-    .card-row { width: 100%; display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-family: -apple-system, sans-serif; font-size: 12px; }
+    .card-row { width: 100%; display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-family: -apple-system, sans-serif; font-size: 12px; color: var(--ink-2); }
     .card-row span:first-child { color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
 
     /* Download — letter style */
@@ -182,7 +182,7 @@
         </div>
         <div class="hero-side">
           <img src="logo.png" alt="浮光">
-          <figcaption>— 浮光，Fuguang</figcaption>
+          <figcaption>— 浮光，floatlight</figcaption>
         </div>
       </div>
     </div>
@@ -267,7 +267,7 @@
           </ul>
         </div>
         <div class="card-art">
-          <div class="corner">FUGUANG</div>
+          <div class="corner">floatlight</div>
           <div class="corner-r">No. 047</div>
           <div class="card-avatar"></div>
           <div class="card-name">艾尔莎 · 霜语</div>
