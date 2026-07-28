@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>浮光世界观编辑器 · Fluent Design 预览</title>
+<style>
+  /* ============ Fluent Design System 令牌（与 src/index.css 同步） ============ */
+  :root, [data-theme="light"] {
+    --bg: #FAF9F8; --bg-elev: #FFFFFF; --bg-sunken: #F3F2F1;
+    --fg: #242424; --fg-muted: #616161; --border: #D1D1D1;
+    --accent: #0F6CBD; --accent-soft: #C7E0F4; --accent-2: #5B5FC7;
+    --chip: #EFF6FC; --chip-fg: #0F6CBD; --danger: #C4314B; --ok: #13A10E;
+    --shadow: 0 1px 2px rgba(0,0,0,.14), 0 0 2px rgba(0,0,0,.12);
+    --shadow-md: 0 2px 4px rgba(0,0,0,.14), 0 0 2px rgba(0,0,0,.12);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,.14), 0 0 2px rgba(0,0,0,.12);
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --ring: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+  }
+  [data-theme="dark"] {
+    --bg: #1F1F1F; --bg-elev: #2B2B2B; --bg-sunken: #161616;
+    --fg: #FFFFFF; --fg-muted: #B0B0B0; --border: #3D3D3D;
+    --accent: #2899F5; --accent-soft: #0F2A44; --accent-2: #8B8BF7;
+    --chip: #1F3A52; --chip-fg: #6CB6F5; --danger: #F1707B; --ok: #6CCB5F;
+    --shadow: 0 1px 2px rgba(0,0,0,.28), 0 0 2px rgba(0,0,0,.20);
+    --shadow-md: 0 2px 4px rgba(0,0,0,.28), 0 0 2px rgba(0,0,0,.20);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,.28), 0 0 2px rgba(0,0,0,.20);
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --ring: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+  }
+  [data-theme="blue"] {
+    --bg: #0E1B2A; --bg-elev: #15263A; --bg-sunken: #0A141F;
+    --fg: #E6EEF6; --fg-muted: #93A4B8; --border: #2A3F57;
+    --accent: #2DA3E0; --accent-soft: #103048; --accent-2: #7AA8E0;
+    --chip: #103048; --chip-fg: #6FC0EC; --danger: #F0808A; --ok: #5FC57F;
+    --shadow: 0 1px 2px rgba(0,0,0,.40), 0 0 2px rgba(0,0,0,.30);
+    --shadow-md: 0 2px 4px rgba(0,0,0,.40), 0 0 2px rgba(0,0,0,.30);
+    --shadow-lg: 0 8px 16px rgba(0,0,0,.40), 0 0 2px rgba(0,0,0,.30);
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --ring: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+  }
+  [data-theme="warm"] {
+    --bg: #F7F2E9; --bg-elev: #FCF9F2; --bg-sunken: #EFE7D6;
+    --fg: #3A2E1F; --fg-muted: #7A6A53; --border: #DCCFB6;
+    --accent: #BE6A15; --accent-soft: #F0E0C8; --accent-2: #A85B1E;
+    --chip: #F1E4CD; --chip-fg: #9A5B16; --danger: #C0392B; --ok: #5B8C2A;
+    --shadow: 0 1px 2px rgba(90,70,30,.16), 0 0 2px rgba(90,70,30,.12);
+    --shadow-md: 0 2px 4px rgba(90,70,30,.16), 0 0 2px rgba(90,70,30,.12);
+    --shadow-lg: 0 8px 16px rgba(90,70,30,.16), 0 0 2px rgba(90,70,30,.12);
+    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+    --ring: 0 0 0 2px var(--bg-elev), 0 0 0 4px var(--accent);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased; line-height: 1.5;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* —— 顶部条 —— */
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: var(--bg-elev);
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    box-shadow: var(--shadow); margin-bottom: 28px;
+  }
+  .topbar .logo {
+    width: 34px; height: 34px; border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px;
+  }
+  .topbar h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  .topbar .sub { font-size: 12px; color: var(--fg-muted); }
+  .theme-switch { margin-left: auto; display: flex; gap: 6px; }
+  .theme-switch button {
+    border: 1px solid var(--border); background: var(--bg-elev); color: var(--fg-muted);
+    border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; cursor: pointer;
+    transition: all .12s ease;
+  }
+  .theme-switch button:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .theme-switch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+  /* —— 区块 —— */
+  section { margin-bottom: 36px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-muted); margin: 0 0 14px; }
+  .grid { display: grid; gap: 14px; }
+  .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 760px) { .grid.cols-4, .grid.cols-3 { grid-template-columns: repeat(2, 1fr); } }
+
+  /* —— 色板 —— */
+  .swatch { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--bg-elev); }
+  .swatch .chip-c { height: 56px; }
+  .swatch .meta { padding: 10px 12px; }
+  .swatch .name { font-size: 13px; font-weight: 600; }
+  .swatch .hex { font-size: 11px; color: var(--fg-muted); font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  /* —— 卡片 —— */
+  .card {
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 16px; box-shadow: var(--shadow);
+    transition: box-shadow .2s ease, transform .2s ease;
+  }
+  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 13px; color: var(--fg-muted); }
+
+  /* —— 迷你工具栏 —— */
+  .mini-toolbar {
+    display: flex; align-items: center; gap: 6px; padding: 10px;
+    background: var(--bg-sunken); border: 1px solid var(--border); border-radius: var(--radius-md);
+  }
+  .tool-btn {
+    width: 40px; height: 40px; border: none; background: transparent; color: var(--fg-muted);
+    border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .12s ease;
+  }
+  .tool-btn:hover { background: var(--bg-hover); color: var(--fg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .tool-btn.active, .tool-btn.mod-active {
+    background: var(--accent-soft); color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .spacer { flex: 1; }
+
+  /* —— 标签 / 徽章 —— */
+  .tab-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--radius-sm);
+    background: var(--bg-elev); border: 1px solid var(--border); font-size: 13px; cursor: pointer; transition: all .12s ease; }
+  .tab:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.accent { background: var(--chip); color: var(--chip-fg); }
+  .badge.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .badge.warn { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+
+  /* —— 输入 —— */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--fg-muted); }
+  .field input { padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg-elev); color: var(--fg); font-size: 14px; font-family: inherit; transition: all .12s ease; }
+  .field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+
+  /* —— 按钮 —— */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .12s ease; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.06); box-shadow: var(--shadow-md); }
+  .btn.default { background: var(--bg-elev); color: var(--fg); border-color: var(--border); }
+  .btn.default:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+  /* —— 图标 —— */
+  svg.fi { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* —— 排版示例 —— */
+  .type-row { display: flex; align-items: baseline; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .type-row .sz { color: var(--fg-muted); font-size: 12px; width: 64px; flex: none; font-family: ui-monospace, monospace; }
+  .radius-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .radius-demo { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); }
+  .radius-box { width: 64px; height: 64px; background: var(--accent-soft); border: 1px solid var(--accent); }
+
+  table.tokens { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.tokens th, table.tokens td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.tokens th { color: var(--fg-muted); font-weight: 600; }
+  .note { font-size: 12px; color: var(--fg-muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 顶部条 + 主题切换 -->
+  <div class="topbar">
+    <div class="logo">浮</div>
+    <div>
+      <h1>浮光世界观编辑器</h1>
+      <div class="sub">Fluent Design System · v1.6.13-preview</div>
+    </div>
+    <div class="theme-switch" role="group" aria-label="主题切换">
+      <button data-theme-btn="light" aria-pressed="true">浅色</button>
+      <button data-theme-btn="dark" aria-pressed="false">深色</button>
+      <button data-theme-btn="blue" aria-pressed="false">蓝调</button>
+      <button data-theme-btn="warm" aria-pressed="false">暖色</button>
+    </div>
+  </div>
+
+  <!-- 设计理念 -->
+  <section>
+    <h2>设计语言 · Fluent 原则</h2>
+    <div class="grid cols-4">
+      <div class="card"><h3>通信蓝 主色</h3><p>#0F6CBD 作为强调色，呼应 Windows 11 原生 Fluent 视觉。</p></div>
+      <div class="card"><h3>Segoe UI 字体</h3><p>系统级字体栈，中文回退 PingFang SC / 微软雅黑。</p></div>
+      <div class="card"><h3>克制圆角</h3><p>控件 4px、卡片/面板 8px，建立清晰层级。</p></div>
+      <div class="card"><h3>Reveal 高光</h3><p>悬停时浅强调描边，柔和反馈而非重材质。</p></div>
+    </div>
+  </section>
+
+  <!-- 色板 -->
+  <section>
+    <h2>色彩令牌（当前主题）</h2>
+    <div class="grid cols-4" id="palette"></div>
+  </section>
+
+  <!-- 迷你工具栏 + 图标 -->
+  <section>
+    <h2>命令栏 · Fluent UI System Icons</h2>
+    <div class="mini-toolbar">
+      <button class="tool-btn mod-active" title="实体库" aria-label="实体库">
+        <svg class="fi" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="tool-btn" title="线索板" aria-label="线索板">
+        <svg class="fi" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 6h6a4 4 0 0 1 4 4v6"/></svg>
+      </button>
+      <button class="tool-btn" title="一致性检查" aria-label="一致性检查">
+        <svg class="fi" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="tool-btn" title="协作与分享" aria-label="协作与分享">
+        <svg class="fi" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5"/></svg>
+      </button>
+      <span class="spacer"></span>
+      <button class="tool-btn" title="文件树" aria-label="文件树">
+        <svg class="fi" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M3 9h6"/></svg>
+      </button>
+      <button class="tool-btn" title="AI 侧栏" aria-label="AI 侧栏">
+        <svg class="fi" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>
+      </button>
+      <button class="tool-btn" title="保存" aria-label="保存">
+        <svg class="fi" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7M8 21v-6h8v6"/></svg>
+      </button>
+    </div>
+    <p class="note">原 emoji 图标（📚🔗✅📤 等）已替换为 Fluent UI System Icons 内联 SVG（MIT 授权，离线可用）。用户文档内自定义 emoji 原样保留，不破坏数据。</p>
+  </section>
+
+  <!-- 标签 / 徽章 -->
+  <section>
+    <h2>标签页 · 状态徽章</h2>
+    <div class="tab-row" style="margin-bottom:14px;">
+      <span class="tab active">📖 第一章 · 创世</span>
+      <span class="tab">实体库</span>
+      <span class="tab">线索板</span>
+    </div>
+    <div class="tab-row">
+      <span class="badge accent">模块</span>
+      <span class="badge ok">已保存</span>
+      <span class="badge warn">待校验</span>
+    </div>
+  </section>
+
+  <!-- 输入框 + 按钮 -->
+  <section>
+    <h2>表单控件</h2>
+    <div class="grid cols-3">
+      <div class="field">
+        <label>文档标题</label>
+        <input type="text" value="第一章 · 创世" />
+      </div>
+      <div class="field">
+        <label>搜索</label>
+        <input type="text" placeholder="搜索 文档 / 草稿 / 时间轴 / 可视化" />
+      </div>
+      <div class="field" style="justify-content:flex-end;">
+        <label>&nbsp;</label>
+        <div style="display:flex; gap:8px;">
+          <button class="btn default">取消</button>
+          <button class="btn primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 卡片阴影 -->
+  <section>
+    <h2>层级阴影（Elevation）</h2>
+    <div class="grid cols-3">
+      <div class="card"><h3>基础卡片</h3><p>--shadow：1px 轻投影，常驻表面。</p></div>
+      <div class="card" style="box-shadow:var(--shadow-md)"><h3>悬停卡片</h3><p>--shadow-md：2–4px，悬停/聚焦抬升。</p></div>
+      <div class="card" style="box-shadow:var(--shadow-lg)"><h3>模态/弹窗</h3><p>--shadow-lg：8–16px，强层级分离。</p></div>
+    </div>
+  </section>
+
+  <!-- 圆角 + 排版 -->
+  <section>
+    <h2>圆角与排版</h2>
+    <div class="radius-row" style="margin-bottom:20px;">
+      <div class="radius-demo"><div class="radius-box" style="border-radius:var(--radius-sm)"></div>4px 控件</div>
+      <div class="radius-demo"><div class="radius-box" style="border-radius:var(--radius-md)"></div>8px 卡片</div>
+      <div class="radius-demo"><div class="radius-box" style="border-radius:var(--radius-lg)"></div>12px</div>
+      <div class="radius-demo"><div class="radius-box" style="border-radius:var(--radius-xl)"></div>16px</div>
+    </div>
+    <div class="type-row"><span class="sz">36px</span><span style="font-size:36px;font-weight:700">世界观标题</span></div>
+    <div class="type-row"><span class="sz">24px</span><span style="font-size:24px;font-weight:600">章节标题</span></div>
+    <div class="type-row"><span class="sz">16px</span><span style="font-size:16px;font-weight:500">正文 / UI</span></div>
+    <div class="type-row"><span class="sz">14px</span><span style="font-size:14px">次要文本</span></div>
+    <div class="type-row"><span class="sz">12px</span><span style="font-size:12px;color:var(--fg-muted)">标签 / 说明</span></div>
+  </section>
+
+  <!-- 令牌表 -->
+  <section>
+    <h2>核心令牌速查</h2>
+    <table class="tokens">
+      <thead><tr><th>令牌</th><th>作用</th><th>示例值（浅色）</th></tr></thead>
+      <tbody>
+        <tr><td>--accent</td><td>主强调色</td><td>#0F6CBD</td></tr>
+        <tr><td>--accent-soft</td><td>浅染背景 / 激活态</td><td>#C7E0F4</td></tr>
+        <tr><td>--bg / --bg-elev / --bg-sunken</td><td>背景三级</td><td>#FAF9F8 / #FFF / #F3F2F1</td></tr>
+        <tr><td>--fg / --fg-muted</td><td>前景 / 次级</td><td>#242424 / #616161</td></tr>
+        <tr><td>--border</td><td>描边</td><td>#D1D1D1</td></tr>
+        <tr><td>--radius-sm / --radius-md</td><td>圆角</td><td>4px / 8px</td></tr>
+        <tr><td>--ring</td><td>焦点框（2px 底 + 2px 强调）</td><td>0 0 0 2px #FFF, 0 0 0 4px #0F6CBD</td></tr>
+        <tr><td>--shadow / --shadow-md / --shadow-lg</td><td>三级阴影</td><td>见上文</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+<script>
+  // 主题切换
+  const html = document.documentElement;
+  const btns = document.querySelectorAll('[data-theme-btn]');
+  function applyTheme(t) {
+    html.setAttribute('data-theme', t);
+    btns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === t)));
+    renderPalette(t);
+  }
+  btns.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeBtn)));
+
+  // 当前主题色板渲染
+  const PALETTES = {
+    light: { '--accent':'#0F6CBD','--accent-soft':'#C7E0F4','--accent-2':'#5B5FC7','--bg':'#FAF9F8','--bg-elev':'#FFFFFF','--bg-sunken':'#F3F2F1','--fg':'#242424','--fg-muted':'#616161','--border':'#D1D1D1','--danger':'#C4314B','--ok':'#13A10E' },
+    dark:  { '--accent':'#2899F5','--accent-soft':'#0F2A44','--accent-2':'#8B8BF7','--bg':'#1F1F1F','--bg-elev':'#2B2B2B','--bg-sunken':'#161616','--fg':'#FFFFFF','--fg-muted':'#B0B0B0','--border':'#3D3D3D','--danger':'#F1707B','--ok':'#6CCB5F' },
+    blue:  { '--accent':'#2DA3E0','--accent-soft':'#103048','--accent-2':'#7AA8E0','--bg':'#0E1B2A','--bg-elev':'#15263A','--bg-sunken':'#0A141F','--fg':'#E6EEF6','--fg-muted':'#93A4B8','--border':'#2A3F57','--danger':'#F0808A','--ok':'#5FC57F' },
+    warm:  { '--accent':'#BE6A15','--accent-soft':'#F0E0C8','--accent-2':'#A85B1E','--bg':'#F7F2E9','--bg-elev':'#FCF9F2','--bg-sunken':'#EFE7D6','--fg':'#3A2E1F','--fg-muted':'#7A6A53','--border':'#DCCFB6','--danger':'#C0392B','--ok':'#5B8C2A' }
+  };
+  const LABELS = { '--accent':'主强调','--accent-soft':'浅染','--accent-2':'靛蓝辅','--bg':'背景','--bg-elev':'抬升面','--bg-sunken':'下沉面','--fg':'前景','--fg-muted':'次级','--border':'描边','--danger':'错误','--ok':'成功' };
+  function renderPalette(t) {
+    const p = PALETTES[t]; const box = document.getElementById('palette'); box.innerHTML = '';
+    Object.keys(p).forEach(k => {
+      const d = document.createElement('div'); d.className = 'swatch';
+      d.innerHTML = `<div class="chip-c" style="background:${p[k]}"></div><div class="meta"><div class="name">${LABELS[k]}</div><div class="hex">${k} · ${p[k]}</div></div>`;
+      box.appendChild(d);
+    });
+  }
+  renderPalette('light');
+</script>
+</body>
+</html>

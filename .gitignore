@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Build outputs
+dist/
+release/
+android/app/build/
+*.exe
+*.apk
+*.blockmap
+*.zip
+
+# Generated assets
+generated-images/
+
+# Backup / temporary files
+.deleted-backup/
+*.bak
+*.tmp
+*.swp
+*~
+
+# Large bundled SDKs (should not be version-controlled)
+android-sdk/
+cmdline-tools.zip
+
+# IDE / OS files
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+venv_err.txt
+
+# Local project memory / tooling
+.workbuddy/
+
+# Vite temp files
+vite.config.ts.timestamp-*
+
+# Electron / Capacitor
+*.app
+*.dmg
+*.deb
+*.rpm
+*.snap

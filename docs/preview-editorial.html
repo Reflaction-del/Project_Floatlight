@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="浮光世界观编辑器 - 为小说作者、游戏策划、TRPG 主持人打造的世界观管理工具。">
+  <title>浮光 — 为讲故事的人，做一个值得托付的工具</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    :root {
+      --paper: #f5efe4;
+      --paper-2: #ebe2d0;
+      --ink: #1a1612;
+      --ink-2: #4a4036;
+      --ink-3: #8a7d6d;
+      --accent: #b8533e;
+      --accent-2: #c87f5a;
+      --line: #d9cfb8;
+      --max: 1200px;
+    }
+    body {
+      font-family: Georgia, "Source Serif Pro", "Songti SC", "STSong", serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(26,22,18,0.04) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: var(--max); margin: 0 auto; padding: 0 40px; }
+    .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+    /* Top bar — minimal, like a magazine masthead */
+    .topbar { padding: 24px 0; border-bottom: 1px solid var(--line); }
+    .topbar .container { display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; font-size: 13px; letter-spacing: 0.05em; }
+    .topbar .left { display: flex; align-items: center; gap: 12px; }
+    .topbar img { width: 28px; height: 28px; border-radius: 4px; }
+    .topbar .vol { color: var(--ink-3); }
+    .topbar nav { display: flex; gap: 28px; text-transform: uppercase; }
+    .topbar nav a:hover { color: var(--accent); }
+
+    /* Hero — magazine cover style */
+    .hero { padding: 80px 0 100px; border-bottom: 2px solid var(--ink); position: relative; }
+    .hero .issue { font-family: -apple-system, sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 32px; display: flex; align-items: center; gap: 16px; }
+    .hero .issue::after { content: ""; flex: 1; height: 1px; background: var(--ink-3); }
+    .hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px; align-items: end; }
+    .hero h1 { font-family: Georgia, "Source Serif Pro", "Songti SC", serif; font-size: clamp(48px, 8vw, 96px); font-weight: 400; line-height: 1; letter-spacing: -0.025em; margin-bottom: 24px; }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero .kicker { font-family: -apple-system, sans-serif; font-size: 14px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 20px; font-weight: 600; }
+    .hero .deck { font-size: clamp(18px, 1.8vw, 22px); color: var(--ink-2); font-style: italic; line-height: 1.5; max-width: 520px; margin-bottom: 40px; }
+    .hero-meta { display: flex; gap: 32px; font-family: -apple-system, sans-serif; font-size: 13px; color: var(--ink-3); }
+    .hero-meta strong { color: var(--ink); display: block; font-size: 16px; margin-bottom: 2px; font-weight: 500; }
+    .hero-cta { margin-top: 40px; display: flex; gap: 20px; align-items: center; font-family: -apple-system, sans-serif; }
+    .hero-cta a:first-child { padding: 14px 28px; background: var(--ink); color: var(--paper); border-radius: 0; font-weight: 500; font-size: 14px; letter-spacing: 0.05em; transition: all 0.2s; }
+    .hero-cta a:first-child:hover { background: var(--accent); }
+    .hero-cta a:last-child { font-size: 14px; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+    .hero-cta a:last-child:hover { color: var(--accent); border-color: var(--accent); }
+    .hero-side { text-align: right; }
+    .hero-side img { width: 100%; max-width: 280px; border-radius: 50%; border: 1px solid var(--line); box-shadow: 0 30px 60px rgba(26,22,18,0.15); }
+    .hero-side figcaption { font-family: -apple-system, sans-serif; font-size: 11px; color: var(--ink-3); margin-top: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
+
+    /* Pull quote */
+    .pullquote { padding: 80px 0; text-align: center; border-bottom: 1px solid var(--line); position: relative; }
+    .pullquote blockquote { font-size: clamp(24px, 3.5vw, 38px); line-height: 1.35; font-style: italic; max-width: 800px; margin: 0 auto; }
+    .pullquote blockquote::before, .pullquote blockquote::after { content: ""; display: block; width: 40px; height: 1px; background: var(--ink); margin: 24px auto; }
+    .pullquote cite { display: block; margin-top: 16px; font-family: -apple-system, sans-serif; font-style: normal; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
+
+    /* Sections — chapter-style */
+    section { padding: 100px 0; border-bottom: 1px solid var(--line); position: relative; }
+    .chapter-head { display: grid; grid-template-columns: 80px 1fr; gap: 40px; align-items: baseline; margin-bottom: 64px; }
+    .chapter-head .ch-num { font-family: Georgia, serif; font-size: 60px; font-style: italic; color: var(--accent); line-height: 1; font-weight: 400; }
+    .chapter-head h2 { font-family: Georgia, "Songti SC", serif; font-size: clamp(32px, 4.5vw, 52px); font-weight: 400; line-height: 1.15; letter-spacing: -0.02em; }
+    .chapter-head .deck { font-family: -apple-system, sans-serif; font-size: 14px; color: var(--ink-3); margin-top: 12px; letter-spacing: 0.05em; }
+
+    /* Feature list — newspaper-style columns */
+    .features-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--line); }
+    .feature { padding: 32px 28px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .feature:last-child { border-right: none; }
+    .feature:nth-child(3n) { border-right: none; }
+    .feature:nth-last-child(-n+3) { border-bottom: none; }
+    .feature .num { font-family: Georgia, serif; font-style: italic; color: var(--accent); font-size: 14px; margin-bottom: 12px; }
+    .feature h3 { font-family: Georgia, serif; font-size: 22px; font-weight: 400; margin-bottom: 12px; line-height: 1.3; }
+    .feature p { color: var(--ink-2); font-size: 14px; line-height: 1.7; font-family: -apple-system, "PingFang SC", sans-serif; }
+
+    /* Forge — editorial spread */
+    .forge-spread { display: grid; grid-template-columns: 5fr 4fr; gap: 80px; align-items: start; padding-top: 32px; border-top: 1px solid var(--line); }
+    .forge-spread h3 { font-family: Georgia, serif; font-size: 32px; font-weight: 400; line-height: 1.3; margin-bottom: 24px; }
+    .forge-spread .lede { font-size: 17px; line-height: 1.8; color: var(--ink-2); margin-bottom: 24px; }
+    .forge-spread .lede::first-letter { font-family: Georgia, serif; font-size: 60px; float: left; line-height: 0.9; margin-right: 8px; margin-top: 6px; color: var(--accent); font-weight: 400; }
+    .forge-spread ul { list-style: none; columns: 2; column-gap: 24px; margin-top: 32px; }
+    .forge-spread li { padding: 8px 0; border-bottom: 1px dotted var(--line); font-family: -apple-system, sans-serif; font-size: 14px; display: flex; align-items: center; gap: 8px; break-inside: avoid; }
+    .forge-spread li::before { content: "✦"; color: var(--accent); font-size: 12px; }
+    .card-art {
+      border: 1px solid var(--line); background: white;
+      aspect-ratio: 3/4; padding: 36px;
+      display: flex; flex-direction: column; align-items: center;
+      box-shadow: 0 30px 60px rgba(26,22,18,0.12);
+      position: relative; overflow: hidden;
+    }
+    .card-art::before {
+      content: "FUGUANG"; position: absolute; font-size: 80px; font-weight: 700;
+      color: rgba(184, 83, 62, 0.06); transform: rotate(-12deg); top: 38%; left: -8%;
+      font-family: Georgia, serif;
+    }
+    .card-art .corner { position: absolute; top: 12px; left: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
+    .card-art .corner-r { position: absolute; top: 12px; right: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); font-family: -apple-system, sans-serif; }
+    .card-avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); margin-bottom: 20px; box-shadow: 0 12px 32px rgba(184, 83, 62, 0.25); margin-top: 24px; }
+    .card-name { font-family: Georgia, serif; font-size: 22px; margin-bottom: 4px; }
+    .card-role { font-size: 12px; color: var(--ink-3); font-family: -apple-system, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 32px; }
+    .card-row { width: 100%; display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); font-family: -apple-system, sans-serif; font-size: 12px; }
+    .card-row span:first-child { color: var(--ink-3); letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
+
+    /* Download — letter style */
+    .download-block { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    .download-block h3 { font-family: Georgia, serif; font-size: 36px; font-weight: 400; line-height: 1.3; margin-bottom: 16px; }
+    .download-block p { color: var(--ink-2); font-size: 16px; margin-bottom: 32px; }
+    .download-block .letter { font-family: -apple-system, sans-serif; }
+    .download-block .letter a { display: block; padding: 20px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
+    .download-block .letter a:hover { padding-left: 12px; color: var(--accent); }
+    .download-block .letter strong { font-size: 18px; font-weight: 500; }
+    .download-block .letter small { color: var(--ink-3); font-size: 13px; display: block; margin-top: 4px; }
+    .download-block .letter .arrow { font-family: Georgia, serif; font-size: 24px; }
+
+    /* Footer */
+    footer { padding: 60px 0; }
+    footer .container { display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, sans-serif; font-size: 13px; color: var(--ink-3); }
+    footer .links { display: flex; gap: 24px; }
+
+    @media (max-width: 720px) {
+      .container { padding: 0 24px; }
+      .hero-grid, .forge-spread, .download-block { grid-template-columns: 1fr; gap: 32px; }
+      .hero-side { text-align: center; }
+      .features-list { grid-template-columns: 1fr; }
+      .feature { border-right: none !important; }
+      .chapter-head { grid-template-columns: 1fr; gap: 8px; }
+      .chapter-head .ch-num { font-size: 40px; }
+      footer .container { flex-direction: column; gap: 16px; }
+      .topbar nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="container">
+      <div class="left">
+        <img src="logo-128.png" alt="浮光">
+        <span><strong>浮光</strong> · 世界观编辑器</span>
+      </div>
+      <span class="vol">Vol. 2 · Issue 8</span>
+      <nav>
+        <a href="#features">功能</a>
+        <a href="#forge">物料生成</a>
+        <a href="#download">下载</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub</a>
+      </nav>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="container">
+      <div class="issue">本期专题 — 为讲故事的人做一个工具</div>
+      <div class="hero-grid">
+        <div>
+          <div class="kicker">A Tool for Worldbuilders</div>
+          <h1>让世界观的<br>每一处<em>细节</em>，<br>都有据可循。</h1>
+          <p class="deck">一份面向小说作者、游戏策划、TRPG 主持人的世界观管理工具。把零散的灵感，整合成可用的产出物。</p>
+          <div class="hero-meta sans">
+            <div><strong>6+</strong>核心模块</div>
+            <div><strong>3</strong>平台覆盖</div>
+            <div><strong>MIT</strong>开源协议</div>
+          </div>
+          <div class="hero-cta">
+            <a href="https://github.com/Reflaction-del/Project_Floatlight/releases">免费下载</a>
+            <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">在 GitHub 查看</a>
+          </div>
+        </div>
+        <div class="hero-side">
+          <img src="logo.png" alt="浮光">
+          <figcaption>— 浮光，Fuguang</figcaption>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="pullquote">
+    <div class="container">
+      <blockquote>
+        世界观不是设定清单，<br>
+        是一张活的网。
+      </blockquote>
+      <cite>— 编辑寄语</cite>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="container">
+      <div class="chapter-head">
+        <div class="ch-num">I</div>
+        <div>
+          <h2>一个工具，覆盖整个创作链路。</h2>
+          <div class="deck sans">From spark to artifact — six modules, one shared dataset.</div>
+        </div>
+      </div>
+      <div class="features-list">
+        <div class="feature">
+          <div class="num">No. 01</div>
+          <h3>实体库</h3>
+          <p>角色、地点、组织、概念、文档，自定义类型与字段，让每个设定都有自己的位置。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 02</div>
+          <h3>关系图</h3>
+          <p>用可视化网络洞察实体之间的关联，复杂关系也能一眼看清。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 03</div>
+          <h3>时间线</h3>
+          <p>多事件编排与影响力可视化，让历史脉络与关键节点清晰可见。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 04</div>
+          <h3>一致性检查</h3>
+          <p>自动发现设定冲突与逻辑漏洞，避免长篇写到一半才发现前后矛盾。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 05</div>
+          <h3>三栏式布局</h3>
+          <p>工具栏、文件树、工作区、赋能侧栏自由组合，像整理笔记一样管理世界。</p>
+        </div>
+        <div class="feature">
+          <div class="num">No. 06</div>
+          <h3>AI 赋能</h3>
+          <p>内置 OpenAI 兼容接口，文章抽取实体、智能消歧、自然语言生成模板。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="forge">
+    <div class="container">
+      <div class="chapter-head">
+        <div class="ch-num">II</div>
+        <div>
+          <h2>把设定数据，变成可用产出物。</h2>
+          <div class="deck sans">Visual artifacts generated from your world, not from scratch.</div>
+        </div>
+      </div>
+      <div class="forge-spread">
+        <div>
+          <h3>MaterialForge — 一份模板，便是一张卡片。</h3>
+          <p class="lede">视觉物料生成器直接读取你的实体数据、世界风格与模板定义，一键生成角色卡、设定卡、关系图卡等视觉物料。不需要 PS，不需要画师，不需要重新整理格式。绑定实体字段、选择模板风格、按一个键导出。</p>
+          <ul>
+            <li>模板化卡片</li>
+            <li>风格统一调色板</li>
+            <li>字段绑定八源解析</li>
+            <li>字体与纹理管理</li>
+            <li>导出 PNG / PDF / SVG</li>
+            <li>批量套系生成</li>
+            <li>AI 生成文案</li>
+            <li>AI 生成头像</li>
+          </ul>
+        </div>
+        <div class="card-art">
+          <div class="corner">FUGUANG</div>
+          <div class="corner-r">No. 047</div>
+          <div class="card-avatar"></div>
+          <div class="card-name">艾尔莎 · 霜语</div>
+          <div class="card-role">北境守夜人 · 冰法师</div>
+          <div class="card-row"><span>年龄</span><span>24</span></div>
+          <div class="card-row"><span>出身</span><span>霜语家族末裔</span></div>
+          <div class="card-row"><span>阵营</span><span>守序中立</span></div>
+          <div class="card-row"><span>能力</span><span>冰晶操控</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="container">
+      <div class="chapter-head">
+        <div class="ch-num">III</div>
+        <div>
+          <h2>免费下载，开箱即用。</h2>
+          <div class="deck sans">No tracking. No watermark. Forever free.</div>
+        </div>
+      </div>
+      <div class="download-block">
+        <div>
+          <h3>选择适合你设备的版本。</h3>
+          <p>浮光完全开源，所有功能完整、无水印、无追踪。下载后即可使用，无需注册。</p>
+          <p style="font-style: italic; color: var(--ink-3); font-size: 14px;">— 详情见 GitHub Releases 页面。</p>
+        </div>
+        <div class="letter">
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">
+            <div>
+              <strong>Windows</strong>
+              <small>安装包 + 便携版 · Win 10 / 11</small>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">
+            <div>
+              <strong>Android</strong>
+              <small>侧载 APK · Android 8.0+</small>
+            </div>
+            <span class="arrow">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div>© 2026 浮光 · MIT License · 为讲故事的人打造</div>
+      <div class="links">
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">Releases</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/blob/main/LICENSE" target="_blank">License</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

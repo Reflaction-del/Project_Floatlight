@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="浮光世界观编辑器 - 为小说作者、游戏策划、TRPG 主持人打造的世界观管理工具。">
+  <title>浮光 — 让世界观的每一处细节，都有据可循</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    :root {
+      --bg: #ffffff;
+      --ink: #0a0a0a;
+      --ink-2: #4a4a4a;
+      --ink-3: #8a8a8a;
+      --line: #ececec;
+      --accent: #4f46e5;
+      --accent-soft: #f4f3ff;
+      --max: 1080px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { max-width: var(--max); margin: 0 auto; padding: 0 32px; }
+
+    /* Header — text-only, no background */
+    header { padding: 28px 0; position: sticky; top: 0; background: rgba(255,255,255,0.85); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid var(--line); }
+    header .container { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 15px; }
+    .brand img { width: 24px; height: 24px; border-radius: 5px; }
+    nav { display: flex; gap: 32px; font-size: 14px; color: var(--ink-2); }
+    nav a:hover { color: var(--ink); }
+
+    /* Hero — HUGE whitespace, single column */
+    .hero { padding: 140px 0 160px; }
+    .hero h1 { font-size: clamp(44px, 7vw, 76px); font-weight: 600; line-height: 1.05; letter-spacing: -0.035em; margin-bottom: 28px; max-width: 880px; }
+    .hero h1 .accent { color: var(--accent); font-style: italic; font-weight: 400; }
+    .hero .lede { font-size: clamp(17px, 1.8vw, 20px); color: var(--ink-2); max-width: 580px; margin-bottom: 48px; }
+    .hero .meta-note { font-size: clamp(13px, 1.2vw, 15px); color: var(--ink-3); max-width: 580px; margin-top: -32px; margin-bottom: 48px; line-height: 1.6; }
+    .hero .meta { display: flex; align-items: center; gap: 24px; font-size: 13px; color: var(--ink-3); margin-bottom: 56px; }
+    .hero .meta span { display: inline-flex; align-items: center; gap: 6px; }
+    .hero .meta span::before { content: ""; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
+    .hero .meta span:first-child::before { display: none; }
+    .cta { display: inline-flex; align-items: center; gap: 8px; padding: 14px 22px; background: var(--ink); color: white; border-radius: 999px; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+    .cta:hover { background: var(--accent); transform: translateY(-1px); }
+    .cta-secondary { background: transparent; color: var(--ink); padding: 14px 0; margin-left: 16px; font-size: 14px; font-weight: 500; border-bottom: 1px solid var(--ink); border-radius: 0; }
+
+    /* Marquee logo bar */
+    .marquee { padding: 24px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); overflow: hidden; }
+    .marquee-label { text-align: center; font-size: 12px; color: var(--ink-3); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 18px; }
+    .marquee-row { display: flex; justify-content: center; gap: 56px; flex-wrap: wrap; font-size: 14px; color: var(--ink-2); font-weight: 500; }
+    .marquee-row span { opacity: 0.7; transition: opacity 0.2s; }
+    .marquee-row span:hover { opacity: 1; }
+
+    /* Sections — generous padding, thin dividers */
+    section { padding: 120px 0; border-top: 1px solid var(--line); }
+    .section-head { display: grid; grid-template-columns: 200px 1fr; gap: 64px; margin-bottom: 80px; align-items: start; }
+    .section-head .num { font-size: 13px; color: var(--accent); font-weight: 500; letter-spacing: 0.1em; }
+    .section-head h2 { font-size: clamp(28px, 4vw, 42px); font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; max-width: 560px; }
+    .section-head p { color: var(--ink-2); font-size: 16px; margin-top: 20px; max-width: 560px; }
+
+    /* Feature list — text-led, no boxes */
+    .feature-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+    .feature { background: white; padding: 36px 32px; transition: background 0.2s; }
+    .feature:hover { background: var(--accent-soft); }
+    .feature h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.01em; }
+    .feature p { color: var(--ink-2); font-size: 14px; line-height: 1.7; }
+
+    /* Showcase — split layout */
+    .showcase { display: grid; grid-template-columns: 1.1fr 1fr; gap: 80px; align-items: center; }
+    .showcase-text h3 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 16px; line-height: 1.2; }
+    .showcase-text p { color: var(--ink-2); font-size: 16px; margin-bottom: 24px; }
+    .showcase-text ul { list-style: none; }
+    .showcase-text li { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .showcase-text li span { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .card-demo { aspect-ratio: 3 / 4; border: 1px solid var(--line); border-radius: 16px; background: #fafafa; padding: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .card-demo::before { content: "FUGUANG"; position: absolute; font-size: 80px; font-weight: 700; color: rgba(79, 70, 229, 0.04); transform: rotate(-12deg); }
+    .card-demo-avatar { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5, #818cf8); margin-bottom: 20px; }
+    .card-demo-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .card-demo-role { font-size: 12px; color: var(--ink-3); margin-bottom: 32px; }
+    .card-demo-row { width: 100%; display: flex; justify-content: space-between; padding: 8px 0; font-size: 12px; border-top: 1px solid var(--line); }
+    .card-demo-row span:last-child { color: var(--ink-2); }
+
+    /* Quote block */
+    .quote-block { padding: 80px 0; text-align: center; }
+    .quote-block blockquote { font-size: clamp(22px, 3vw, 32px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.4; max-width: 760px; margin: 0 auto; }
+    .quote-block blockquote::before { content: "“"; display: block; font-size: 80px; color: var(--accent); line-height: 0.5; margin-bottom: 24px; }
+    .quote-block cite { display: block; margin-top: 32px; font-size: 13px; color: var(--ink-3); font-style: normal; }
+
+    /* Download — three columns, minimal */
+    .download-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; max-width: 720px; }
+    .download-card { background: white; padding: 40px; transition: background 0.2s; }
+    .download-card:hover { background: var(--accent-soft); }
+    .download-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+    .download-card p { color: var(--ink-3); font-size: 13px; margin-bottom: 24px; }
+    .download-card a { font-size: 14px; font-weight: 500; border-bottom: 1px solid var(--ink); padding-bottom: 2px; }
+
+    /* Footer */
+    footer { padding: 60px 0 40px; border-top: 1px solid var(--line); }
+    footer .container { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink-3); }
+    footer .links { display: flex; gap: 24px; }
+    footer .links a:hover { color: var(--ink); }
+
+    @media (max-width: 720px) {
+      .hero { padding: 80px 0 100px; }
+      .section-head { grid-template-columns: 1fr; gap: 16px; margin-bottom: 48px; }
+      .feature-list { grid-template-columns: 1fr; }
+      .showcase { grid-template-columns: 1fr; gap: 40px; }
+      .download-grid { grid-template-columns: 1fr; }
+      footer .container { flex-direction: column; gap: 16px; }
+      nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a href="#" class="brand">
+        <img src="logo-128.png" alt="浮光">
+        <span>浮光</span>
+      </a>
+      <nav>
+        <a href="#features">功能</a>
+        <a href="#forge">物料生成</a>
+        <a href="#download">下载</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" style="border-top: none;">
+    <div class="container">
+      <h1>让世界观<br><span class="accent">每一处细节</span>，<br>都有据可循。</h1>
+      <p class="lede">一个面向小说作者、游戏策划、TRPG 主持人的世界观管理工具。集实体库、关系图、时间线、视觉物料生成与 AI 赋能于一体。</p>
+      <p class="meta-note">本介绍页及程序本体的需求分析、功能设计、实现路径规划全部由生成式模型完成。</p>
+      <div class="meta">
+        <span>v2.2.8</span>
+        <span>MIT 开源</span>
+        <span>桌面 + 移动 + 浏览器</span>
+      </div>
+      <div>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" class="cta">免费下载</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" class="cta-secondary" target="_blank">在 GitHub 查看 →</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee">
+    <div class="marquee-label">Built with</div>
+    <div class="marquee-row">
+      <span>Electron 31</span>
+      <span>React 18</span>
+      <span>TypeScript</span>
+      <span>TipTap 2</span>
+      <span>Tailwind v4</span>
+      <span>Zustand</span>
+      <span>Vite 5</span>
+      <span>Capacitor 8</span>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="container">
+      <div class="section-head">
+        <div class="num">— 01</div>
+        <div>
+          <h2>一个工具，覆盖整个创作链路。</h2>
+          <p>从最初的角色构想，到最终的角色卡物料输出，浮光让所有环节共享同一份数据。</p>
+        </div>
+      </div>
+      <div class="feature-list">
+        <div class="feature">
+          <h3>实体库</h3>
+          <p>角色、地点、组织、概念、文档，自定义类型与字段，让每个设定都有家。</p>
+        </div>
+        <div class="feature">
+          <h3>关系图</h3>
+          <p>用可视化网络洞察实体之间的关联，复杂关系一眼看清。</p>
+        </div>
+        <div class="feature">
+          <h3>时间线</h3>
+          <p>多事件编排与影响力可视化，让历史脉络与关键节点清晰可见。</p>
+        </div>
+        <div class="feature">
+          <h3>一致性检查</h3>
+          <p>自动发现设定冲突与逻辑漏洞，避免长篇写到一半才发现前后矛盾。</p>
+        </div>
+        <div class="feature">
+          <h3>三栏式布局</h3>
+          <p>工具栏、文件树、主工作区、赋能侧栏自由组合，像整理笔记一样管理整个世界。</p>
+        </div>
+        <div class="feature">
+          <h3>AI 赋能</h3>
+          <p>内置 OpenAI 兼容接口，文章抽取实体、智能消歧、自然语言生成模板。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="forge">
+    <div class="container">
+      <div class="section-head">
+        <div class="num">— 02</div>
+        <div>
+          <h2>把设定数据，变成可用产出物。</h2>
+          <p>视觉物料生成器 MaterialForge 直接读取实体数据，一键产出角色卡、设定卡、关系图卡。</p>
+        </div>
+      </div>
+      <div class="showcase">
+        <div class="showcase-text">
+          <h3>设计给讲故事的人。</h3>
+          <p>不需要 PS、不需要画师。绑定实体字段、选择模板风格、按一个键导出。</p>
+          <ul>
+            <li><span>模板化卡片</span><span>01</span></li>
+            <li><span>风格系统统一调色板、字体、纹理</span><span>02</span></li>
+            <li><span>字段绑定八源解析</span><span>03</span></li>
+            <li><span>导出 PNG / PDF / SVG</span><span>04</span></li>
+            <li><span>支持批量套系生成</span><span>05</span></li>
+            <li><span>AI 辅助生成文案与头像</span><span>06</span></li>
+          </ul>
+        </div>
+        <div class="card-demo">
+          <div class="card-demo-avatar"></div>
+          <div class="card-demo-name">艾尔莎 · 霜语</div>
+          <div class="card-demo-role">北境守夜人 · 冰法师</div>
+          <div class="card-demo-row"><span>年龄</span><span>24</span></div>
+          <div class="card-demo-row"><span>出身</span><span>霜语家族末裔</span></div>
+          <div class="card-demo-row"><span>阵营</span><span>守序中立</span></div>
+          <div class="card-demo-row"><span>能力</span><span>冰晶操控</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding: 0;">
+    <div class="container">
+      <div class="quote-block">
+        <blockquote>世界观不是设定清单，<br>是一张活的网。</blockquote>
+        <cite>— 浮光团队</cite>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="container">
+      <div class="section-head">
+        <div class="num">— 03</div>
+        <div>
+          <h2>免费下载，开箱即用。</h2>
+          <p>选择适合你设备的版本，所有功能完整、无水印、无追踪。</p>
+        </div>
+      </div>
+      <div class="download-grid">
+        <div class="download-card">
+          <h3>Windows</h3>
+          <p>安装包 + 便携版 · Win 10 / 11</p>
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">下载 →</a>
+        </div>
+        <div class="download-card">
+          <h3>Android</h3>
+          <p>侧载 APK · Android 8.0+</p>
+          <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">下载 →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div>© 2026 浮光 · MIT License</div>
+      <div class="links">
+        <a href="https://github.com/Reflaction-del/Project_Floatlight" target="_blank">GitHub</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/releases" target="_blank">Releases</a>
+        <a href="https://github.com/Reflaction-del/Project_Floatlight/blob/main/LICENSE" target="_blank">License</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

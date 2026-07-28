@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>浮光介绍页 · 风格对比</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0a0a0c;
+      color: #f5f3ef;
+      min-height: 100vh;
+      padding: 60px 40px;
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 28px; font-weight: 600; margin-bottom: 12px; letter-spacing: -0.02em; }
+    .sub { color: #8a8a8a; font-size: 15px; margin-bottom: 48px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .card {
+      background: #18181c;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      color: inherit;
+      display: flex; flex-direction: column;
+    }
+    .card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-4px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .preview {
+      aspect-ratio: 16/10;
+      background: #0a0a0c;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .preview iframe { width: 200%; height: 200%; border: 0; transform: scale(0.5); transform-origin: 0 0; pointer-events: none; }
+    .info { padding: 24px; }
+    .tag { display: inline-block; padding: 4px 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; font-size: 11px; color: #b8b8b8; margin-bottom: 12px; }
+    .info h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
+    .info p { color: #8a8a8a; font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+    .info .open { font-size: 13px; color: #d4a853; }
+    .meta { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .meta span { font-size: 11px; padding: 3px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: #8a8a8a; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    .original { margin-top: 48px; padding: 24px; background: #18181c; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; }
+    .original a { color: #d4a853; font-size: 14px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>浮光介绍页 · 三种风格对比</h1>
+    <p class="sub">点击任意卡片全屏预览；缩略图是页面缩小到 50% 后的真实样子</p>
+
+    <div class="grid">
+      <a href="preview-minimal.html" target="_blank" class="card">
+        <div class="preview"><iframe src="preview-minimal.html"></iframe></div>
+        <div class="info">
+          <span class="tag">A · Minimal</span>
+          <h2>极简留白</h2>
+          <p>白底 + 大量留白 + 细线分隔 + 单一靛蓝点缀。苹果 / Linear / Vercel 那种克制的现代感。</p>
+          <div class="meta">
+            <span>white</span><span>grid</span><span>serif/sans</span><span>1 accent</span>
+          </div>
+          <div class="open">在新标签页打开 →</div>
+        </div>
+      </a>
+
+      <a href="preview-glass.html" target="_blank" class="card">
+        <div class="preview"><iframe src="preview-glass.html"></iframe></div>
+        <div class="info">
+          <span class="tag">B · Glassmorphism</span>
+          <h2>渐变玻璃</h2>
+          <p>紫蓝粉动态渐变 + 毛玻璃卡片 + 圆角。适合创意工具的现代活泼感，年轻有活力。</p>
+          <div class="meta">
+            <span>gradient</span><span>blur</span><span>pill</span><span>neon</span>
+          </div>
+          <div class="open">在新标签页打开 →</div>
+        </div>
+      </a>
+
+      <a href="preview-editorial.html" target="_blank" class="card">
+        <div class="preview"><iframe src="preview-editorial.html"></iframe></div>
+        <div class="info">
+          <span class="tag">C · Editorial</span>
+          <h2>杂志编辑风</h2>
+          <p>米黄书页 + 衬线大标题 + 不对称排版 + 章节式结构。文学杂志气质，最契合「世界观」主题。</p>
+          <div class="meta">
+            <span>parchment</span><span>serif</span><span>asymmetric</span><span>terracotta</span>
+          </div>
+          <div class="open">在新标签页打开 →</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="original">
+      <div>
+        <div style="color: #b8b8b8; font-size: 14px; margin-bottom: 4px;">原版（保留为对照）</div>
+        <div style="font-size: 13px; color: #6a6a6a;">暗色 + 金色点缀 + 星空背景</div>
+      </div>
+      <a href="index.html" target="_blank">查看原版 →</a>
+    </div>
+  </div>
+</body>
+</html>
