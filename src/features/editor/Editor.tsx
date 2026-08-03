@@ -23,6 +23,7 @@ import { EditorContextMenu } from './EditorContextMenu';
 import { useWorldStore } from '../../store/worldStore';
 import type { EditorMode } from '../../store/uiStore';
 import { docToMarkdown } from '../../utils/markdown';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 const lsKey = (id: string) => `fl-doc-${id}`;
 
@@ -317,7 +318,7 @@ export function Editor({ docId, mode }: { docId: string; mode: EditorMode }) {
             <div
               className="ProseMirror"
               style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}
-              dangerouslySetInnerHTML={{ __html: html }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
             />
           </div>
         ) : (

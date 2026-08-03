@@ -2,6 +2,7 @@
 
 import { useAIStore, type AIModel, type EmbeddingModel, type PromptFormat } from '../store/aiStore';
 import { useAIUsageStore, type AIUsageFeature } from '../store/aiUsageStore';
+import { logAI } from './aiLog';
 
 /** 多模态内容片段：纯文本 或 图片（dataURL）。Chat 格式（OpenAI 兼容）原样支持。 */
 export type ChatContentPart =
@@ -178,7 +179,23 @@ export async function chatStream(
   }
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${model.apiKey}` };
 
-  await runStreamInWorker({ url, method: 'POST', headers, body: bodyStr, signal: opts?.signal, onToken, onDone, onError });
+  logAI({
+    level: 'info',
+    phase: 'chat-stream',
+    message: `流式请求发起：${url}`,
+    detail: `模型：${model.model}（${model.format ?? 'chat'}）\n用户消息：${contentText(history[history.length - 1]?.content ?? '').slice(0, 120)}`,
+  });
+  let tokenCount = 0;
+  const wrapToken = (t: string) => { tokenCount += t.length; onToken(t); };
+  const wrapDone = () => {
+    logAI({ level: 'ok', phase: 'chat-stream', message: `流式完成：共收到 ${tokenCount} 字符`, detail: `POST ${url}\n模型：${model.model}` });
+    onDone();
+  };
+  const wrapError = (err: string) => {
+    logAI({ level: 'error', phase: 'chat-stream', message: '流式请求失败：' + err, detail: `POST ${url}\n模型：${model.model}` });
+    onError?.(err);
+  };
+  await runStreamInWorker({ url, method: 'POST', headers, body: bodyStr, signal: opts?.signal, onToken: wrapToken, onDone: wrapDone, onError: wrapError });
 }
 
 interface StreamReq {
@@ -360,8 +377,8 @@ function trackAIUsage(model: AIModel, feature: AIUsageFeature, usage: AIUsageSna
 }
 
 /** 在 Worker 线程执行一次性请求，返回模型回复文本（content）与 usage。 */
-function runCompleteInWorker(req: CompleteReq): Promise<{ text: string; usage: AIUsageSnapshot }> {
-  return new Promise<{ text: string; usage: AIUsageSnapshot }>((resolve, reject) => {
+function runCompleteInWorker(req: CompleteReq): Promise<{ text: string; usage: AIUsageSnapshot; rawSnippet?: string }> {
+  return new Promise<{ text: string; usage: AIUsageSnapshot; rawSnippet?: string }>((resolve, reject) => {
     let worker: Worker;
     try {
       worker = new Worker(new URL('./aiStreamWorker.ts', import.meta.url), { type: 'module' });
@@ -379,7 +396,7 @@ function runCompleteInWorker(req: CompleteReq): Promise<{ text: string; usage: A
       const msg = e.data;
       if (msg.type === 'complete-result') {
         finish();
-        resolve({ text: msg.text ?? '', usage: msg.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+        resolve({ text: msg.text ?? '', usage: msg.usage ?? { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }, rawSnippet: msg.rawSnippet ?? '' });
       } else if (msg.type === 'complete-error') {
         finish();
         reject(new Error(msg.error));
@@ -437,7 +454,9 @@ function extractContent(text: string): { content: string; usage: any } {
       if (d === '[DONE]') continue;
       try {
         const j = JSON.parse(d);
-        content += j?.choices?.[0]?.delta?.content ?? j?.choices?.[0]?.text ?? '';
+        const delta = j?.choices?.[0]?.delta ?? {};
+        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接
+        content += delta?.content ?? delta?.reasoning_content ?? delta?.reasoning ?? j?.choices?.[0]?.text ?? '';
         if (j?.usage) usage = j.usage;
       } catch { /* 忽略不完整/非法行 */ }
     }
@@ -445,7 +464,8 @@ function extractContent(text: string): { content: string; usage: any } {
   }
   try {
     const j = JSON.parse(t);
-    return { content: j?.choices?.[0]?.message?.content ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
+    const msg = j?.choices?.[0]?.message ?? {};
+    return { content: msg?.content ?? msg?.reasoning_content ?? msg?.reasoning ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
   } catch {
     return { content: t, usage: null };
   }
@@ -453,7 +473,7 @@ function extractContent(text: string): { content: string; usage: any } {
 
 /** 主线程退化路径（Worker 不可用时）：fetch + 增量读取 + 解析 content + usage。
  * 与 Worker 端 runComplete 完全一致的处理逻辑，确保本地模型推流时主线程也能让出、不卡死。 */
-async function fallbackComplete(req: CompleteReq): Promise<{ text: string; usage: AIUsageSnapshot }> {
+async function fallbackComplete(req: CompleteReq): Promise<{ text: string; usage: AIUsageSnapshot; rawSnippet?: string }> {
   try {
     const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, signal: req.signal });
     if (!resp.ok) throw new Error(`[HTTP ${resp.status}] ${(await resp.text()).slice(0, 300)}`);
@@ -466,7 +486,7 @@ async function fallbackComplete(req: CompleteReq): Promise<{ text: string; usage
           total_tokens: typeof usage.total_tokens === 'number' ? usage.total_tokens : 0,
         }
       : { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-    return { text: content, usage: snap };
+    return { text: content, usage: snap, rawSnippet: content ? '' : raw.slice(0, 240) };
   } catch (e: any) {
     if (req.signal?.aborted) throw new Error('aborted');
     throw e;
@@ -520,8 +540,29 @@ export async function chatOnce(model: AIModel, history: AIMessage[], opts?: Chat
     bodyStr = JSON.stringify(payload);
   }
 
-  const { text, usage } = await runCompleteInWorker({ url, method: 'POST', headers, body: bodyStr, signal: options.signal });
+  const { text, usage, rawSnippet } = await runCompleteInWorker({ url, method: 'POST', headers, body: bodyStr, signal: options.signal });
   if (options.feature) trackAIUsage(model, options.feature, usage);
+  if (!text) {
+    const phase = (options.feature as string) || 'chat';
+    logAI({
+      level: 'error',
+      phase,
+      message: '模型返回为空：HTTP 200 但未解析出任何内容',
+      detail: `POST ${url}\n模型：${model.model}（${model.format ?? 'chat'}）\n端点：${base}`,
+      raw: rawSnippet || '(空响应体)',
+    });
+    throw new Error(
+      '模型返回为空：端点已响应（HTTP 200）但未解析出文本内容。' +
+      (rawSnippet ? ` 原始响应摘要：${rawSnippet}` : '（响应体为空）') +
+      ' 请检查模型名与提示词格式是否正确（如 DeepSeek-R1/Qwen 推理模型请确认已勾选"输出含深度思考"或改用普通模型）。',
+    );
+  }
+  logAI({
+    level: 'ok',
+    phase: (options.feature as string) || 'chat',
+    message: `调用成功：收到 ${text.length} 字符`,
+    detail: `POST ${url}\n模型：${model.model}`,
+  });
   return text;
 }
 
@@ -622,6 +663,7 @@ export async function embedTexts(model: EmbeddingModel, texts: string[]): Promis
   const resp = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
   if (!resp.ok) {
     const t = await resp.text().catch(() => '');
+    logAI({ level: 'error', phase: 'embed', message: `嵌入请求失败：HTTP ${resp.status}`, detail: `POST ${url}\n模型：${model.model}`, raw: t.slice(0, 300) });
     throw new Error(`[HTTP ${resp.status}] ${t.slice(0, 300)}`);
   }
   const raw = await readAllText(resp);
@@ -635,6 +677,7 @@ export async function embedTexts(model: EmbeddingModel, texts: string[]): Promis
   if (!Array.isArray(data) || data.length === 0) throw new Error('嵌入模型返回格式异常（无 data）');
   // 部分服务按 index 排序返回，确保与输入顺序一致
   data.sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
+  logAI({ level: 'ok', phase: 'embed', message: `嵌入成功：${texts.length} 条文本 → ${data.length} 条向量` });
   return data.map((d: any) => (Array.isArray(d?.embedding) ? d.embedding : []));
 }
 
@@ -696,6 +739,8 @@ function parseMessageFromBody(text: string): RawMessage {
         const j = JSON.parse(d);
         const delta = j?.choices?.[0]?.delta ?? {};
         if (typeof delta.content === 'string') content += delta.content;
+        // 推理模型兜底：正文在 reasoning_content
+        else if (typeof delta.reasoning_content === 'string') content += delta.reasoning_content;
         const tcs = delta.tool_calls;
         if (Array.isArray(tcs)) {
           for (const tc of tcs) {
@@ -715,7 +760,7 @@ function parseMessageFromBody(text: string): RawMessage {
   try {
     const j = JSON.parse(t);
     const msg = j?.choices?.[0]?.message ?? {};
-    return { role: msg.role || 'assistant', content: msg.content ?? null, tool_calls: msg.tool_calls };
+    return { role: msg.role || 'assistant', content: msg.content ?? msg.reasoning_content ?? null, tool_calls: msg.tool_calls };
   } catch {
     return { role: 'assistant', content: t, tool_calls: undefined };
   }
@@ -761,6 +806,12 @@ export async function chatWithTools(
   const base = model.endpoint.replace(/\/+$/, '');
   const url = `${base}/chat/completions`;
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${model.apiKey}` };
+  logAI({
+    level: 'info',
+    phase: (opts?.feature as string) || 'tools',
+    message: `工具调用会话发起：${url}`,
+    detail: `模型：${model.model}\n可用工具：${ctx.tools.map((t) => t.name).join(', ')}`,
+  });
   const toolsPayload = ctx.tools.map((tp) => ({
     type: 'function',
     function: { name: tp.name, description: tp.description, parameters: tp.parameters },
@@ -791,8 +842,21 @@ export async function chatWithTools(
     const raw = await readAllText(resp);
     const msg = parseMessageFromBody(raw);
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      logAI({
+        level: 'ok',
+        phase: (opts?.feature as string) || 'tools',
+        message: `工具会话完成：第 ${turn + 1} 回合，最终回答 ${(msg.content ?? '').length} 字符`,
+        detail: `POST ${url}\n模型：${model.model}`,
+        raw: (msg.content ?? '').slice(0, 400),
+      });
       return msg.content ?? '';
     }
+    logAI({
+      level: 'info',
+      phase: (opts?.feature as string) || 'tools',
+      message: `第 ${turn + 1} 回合：模型请求工具 ${msg.tool_calls.map((tc) => tc.function.name).join(', ')}`,
+      detail: `POST ${url}\n模型：${model.model}`,
+    });
     // 回传 assistant（含 tool_calls）与每个工具的 result
     messages.push({
       role: 'assistant',
@@ -827,9 +891,14 @@ export async function listModels(model: AIModel): Promise<string[]> {
   const url = `${model.endpoint.replace(/\/+$/, '')}/models`;
   try {
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${model.apiKey}` } });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+      logAI({ level: 'error', phase: 'models', message: `拉取模型列表失败：HTTP ${resp.status}`, detail: `GET ${url}` });
+      throw new Error(`HTTP ${resp.status}`);
+    }
     const json = await resp.json();
-    return (json.data || []).map((m: any) => m.id).filter(Boolean);
+    const list = (json.data || []).map((m: any) => m.id).filter(Boolean);
+    logAI({ level: 'ok', phase: 'models', message: `模型列表：${list.length} 个`, detail: `GET ${url}`, raw: list.slice(0, 20).join(', ') });
+    return list;
   } catch (e: any) { throw new Error(e.message); }
 }
 
@@ -903,11 +972,15 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     });
     if (!resp.ok) {
       const text = (await resp.text()).slice(0, 400);
+      logAI({ level: 'error', phase: 'image', message: `图像生成失败：HTTP ${resp.status}`, detail: `POST ${url}\n模型：${model.model}\n尺寸：${size}`, raw: text });
       throw new Error(`HTTP ${resp.status}: ${text}`);
     }
     const json: any = await resp.json();
     const item = json?.data?.[0];
-    if (!item) throw new Error('图像生成返回为空');
+    if (!item) {
+      logAI({ level: 'error', phase: 'image', message: '图像生成返回为空', detail: `POST ${url}\n模型：${model.model}`, raw: JSON.stringify(json).slice(0, 400) });
+      throw new Error('图像生成返回为空');
+    }
     if (item.b64_json) {
       const prefix = item.b64_json.startsWith('data:') ? '' : 'data:image/png;base64,';
       return { dataUrl: prefix + item.b64_json };
@@ -925,15 +998,18 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     if (model.requiresMetering !== false) {
       useAIUsageStore.getState().recordImageGen(model);
     }
+    logAI({ level: 'ok', phase: 'image', message: `图像生成成功（${result.rawUrl ? 'url 下载' : 'b64'}，${size}）`, detail: `POST ${url}\n模型：${model.model}` });
     return result;
   } catch (e: any) {
     // 退化：去掉参考图，用强 prompt 重试一次
     if (opts.refImageDataUrl) {
+      logAI({ level: 'warn', phase: 'image', message: '带参考图生成失败，退化为强 prompt 重试：' + (e?.message || e) });
       try {
         const result = await tryOnce(false);
         if (model.requiresMetering !== false) {
           useAIUsageStore.getState().recordImageGen(model);
         }
+        logAI({ level: 'ok', phase: 'image', message: `退化重试成功（${size}）`, detail: `POST ${url}\n模型：${model.model}` });
         return result;
       } catch {
         throw e;

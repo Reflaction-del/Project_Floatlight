@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { marked } from 'marked';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import { useAIStore } from '../store/aiStore';
 import { useWorldStore } from '../store/worldStore';
 import { useUIStore } from '../store/uiStore';
@@ -42,7 +43,9 @@ function escapeHtml(src: string): string {
 
 function mdToHtml(src: string): string {
   try {
-    return marked.parse(src, { async: false }) as string;
+    // 防注入：marked 默认透传原始 HTML，必须先消毒再注入 DOM。
+    // 恶意文章文件 / 提示词注入可能诱导模型输出 <img onerror>、<script> 等。
+    return sanitizeHtml(marked.parse(src, { async: false }) as string);
   } catch {
     return escapeHtml(src);
   }
@@ -538,6 +541,7 @@ export function CopilotSidebar() {
         <select className="copilot-model" value={currentId} onChange={(e) => setCurrent(e.target.value)}>
           {models.map((m) => <option key={m.id} value={m.id}>{m.label}（{m.model}）</option>)}
         </select>
+        <button className="mode-btn" style={{ fontSize: 11, padding: '2px 6px' }} title="查看 AI 调用日志与模型原始回复" onClick={() => useUIStore.getState().setAILog(true)}>日志</button>
         <button className="mode-btn" style={{ fontSize: 11, padding: '2px 6px' }} onClick={clear}>清空</button>
       </div>
 

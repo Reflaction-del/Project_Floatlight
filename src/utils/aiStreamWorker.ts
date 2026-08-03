@@ -122,7 +122,9 @@ function extractContent(text: string): { content: string; usage: any } {
       if (d === '[DONE]') continue;
       try {
         const j = JSON.parse(d);
-        content += j?.choices?.[0]?.delta?.content ?? j?.choices?.[0]?.text ?? '';
+        const delta = j?.choices?.[0]?.delta ?? {};
+        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接
+        content += delta?.content ?? delta?.reasoning_content ?? delta?.reasoning ?? j?.choices?.[0]?.text ?? '';
         if (j?.usage) usage = j.usage;
       } catch { /* 忽略不完整/非法行 */ }
     }
@@ -130,7 +132,8 @@ function extractContent(text: string): { content: string; usage: any } {
   }
   try {
     const j = JSON.parse(t);
-    return { content: j?.choices?.[0]?.message?.content ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
+    const msg = j?.choices?.[0]?.message ?? {};
+    return { content: msg?.content ?? msg?.reasoning_content ?? msg?.reasoning ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
   } catch {
     return { content: t, usage: null };
   }
@@ -159,7 +162,7 @@ async function runComplete(msg: Extract<InMsg, { type: 'complete' }>) {
           total_tokens: typeof usage.total_tokens === 'number' ? usage.total_tokens : 0,
         }
       : { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
-    ctx.postMessage({ type: 'complete-result', text: content, usage: snap });
+    ctx.postMessage({ type: 'complete-result', text: content, usage: snap, rawSnippet: content ? '' : raw.slice(0, 240) });
   } catch (err: any) {
     if (ctrl.signal.aborted) {
       ctx.postMessage({ type: 'complete-error', error: 'aborted' });

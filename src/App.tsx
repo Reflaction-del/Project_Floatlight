@@ -8,6 +8,7 @@ import { Toolbar } from './components/Toolbar';
 import { FileTree } from './components/FileTree';
 import { CopilotSidebar } from './components/CopilotSidebar';
 import { ProposalCenter } from './components/ProposalCenter';
+import { AILogPanel } from './components/AILogPanel';
 import { TabBar } from './components/TabBar';
 import { TitleBar } from './components/TitleBar';
 import { PromptModal } from './components/PromptModal';
@@ -293,6 +294,7 @@ export default function App() {
         <Main />
         {copilotOpen && <CopilotSidebar />}
         <ProposalCenter />
+        <AILogPanel />
         <PromptModal />
         <OnboardingModal />
         {firstRun && <FirstRunModal />}

@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type { ThemeMode } from '../types';
 
 const LS_ACCENT = 'fl-custom-accent';
+const LS_MODE = 'fl-theme-mode';
+
+const THEME_MODES: ThemeMode[] = ['light', 'dark', 'warm', 'blue', 'system'];
 
 interface ThemeState {
   mode: ThemeMode;
@@ -66,11 +69,24 @@ const saveAccent = (c: string | null) => {
   try { if (c) localStorage.setItem(LS_ACCENT, c); else localStorage.removeItem(LS_ACCENT); } catch {}
 };
 
+/** 读取持久化的外观模式；非法/缺失回退 'light' */
+const loadMode = (): ThemeMode => {
+  try {
+    const raw = localStorage.getItem(LS_MODE);
+    if (raw && (THEME_MODES as string[]).includes(raw)) return raw as ThemeMode;
+  } catch { /* ignore */ }
+  return 'light';
+};
+const saveMode = (m: ThemeMode) => {
+  try { localStorage.setItem(LS_MODE, m); } catch { /* ignore */ }
+};
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  mode: 'light',
+  mode: typeof window !== 'undefined' ? loadMode() : 'light',
   customAccent: typeof window !== 'undefined' ? loadAccent() : null,
   setMode: (m) => {
     set({ mode: m });
+    saveMode(m);
     applyTheme(m);
   },
   setCustomAccent: (c) => {
@@ -81,10 +97,12 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   apply: () => { applyTheme(get().mode); applyAccent(get().customAccent); },
 }));
 
-// 初始化时立刻应用
+// 初始化时立刻应用（含持久化的外观模式：data-theme 属性 + 原生窗口主题）
 if (typeof window !== 'undefined') {
+  const initMode = loadMode();
+  useThemeStore.setState({ mode: initMode });
+  applyTheme(initMode);
   applyAccent(loadAccent());
-  syncWinTheme(useThemeStore.getState().mode); // 初始同步原生窗口主题
   // 监听系统主题变化
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (useThemeStore.getState().mode === 'system') {

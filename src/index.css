@@ -3595,3 +3595,92 @@ button:active,
   border-radius: 999px; background: var(--danger, #e5484d); color: #fff;
   font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
 }
+
+/* ============ AI 调用日志窗口（进度窗口） ============ */
+.ai-log-modal {
+  width: min(760px, 94vw);
+  max-width: 94vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+}
+.ai-log-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-log-head h3 { margin: 0; }
+.ai-log-head .tip { flex: 1 1 100%; margin-top: 2px; }
+.ai-log-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.ai-log-body {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.ai-log-entry {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.ai-log-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.ai-log-time { color: var(--fg-muted); font-variant-numeric: tabular-nums; flex: none; }
+.ai-log-level {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+}
+.ai-log-phase {
+  flex: none;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.ai-log-msg { flex: 1; min-width: 0; word-break: break-all; }
+.ai-log-toggle { flex: none; color: var(--fg-muted); }
+.ai-log-info .ai-log-level { color: #4b8ff3; border-color: #4b8ff3; }
+.ai-log-ok .ai-log-level { color: #2e9e5b; border-color: #2e9e5b; }
+.ai-log-warn .ai-log-level { color: #d97706; border-color: #d97706; }
+.ai-log-error { border-color: var(--danger, #e5484d); }
+.ai-log-error .ai-log-level { color: var(--danger, #e5484d); border-color: var(--danger, #e5484d); }
+.ai-log-error .ai-log-msg { color: var(--danger, #e5484d); }
+.ai-log-entry-detail {
+  border-top: 1px dashed var(--border);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: color-mix(in srgb, var(--bg-elev) 60%, transparent);
+}
+.ai-log-entry-detail pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--fg);
+}
+.ai-log-raw { color: var(--fg-muted); }

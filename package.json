@@ -1,7 +1,7 @@
 {
   "name": "floating-light-v2",
   "private": true,
-  "version": "2.2.8",
+  "version": "2.2.9",
   "type": "module",
   "description": "萨卡萨卡斑斑~~",
   "author": "浮光",
@@ -136,11 +136,11 @@
       "createStartMenuShortcut": true,
       "language": "2052",
       "shortcutName": "浮光世界观编辑器",
-      "artifactName": "浮光世界观编辑器_v2.2.8_Setup.exe",
+      "artifactName": "浮光世界观编辑器_v2.2.9_Setup.exe",
       "runAfterFinish": true
     },
     "portable": {
-      "artifactName": "浮光世界观编辑器_v2.2.8.exe"
+      "artifactName": "浮光世界观编辑器_v2.2.9.exe"
     },
     "directories": {
       "output": "release"

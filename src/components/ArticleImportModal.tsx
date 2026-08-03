@@ -54,7 +54,11 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
       setResult(res);
     } catch (err: any) {
       if (err?.name === 'AbortError' || err === '手动终止') setError('已取消抽取。');
-      else setError('抽取失败：' + (err?.message || String(err)));
+      else {
+        setError('抽取失败：' + (err?.message || String(err)));
+        // 失败时自动打开 AI 日志窗口，方便查看端点到底返回了什么
+        useUIStore.getState().setAILog(true);
+      }
     } finally {
       setBusy(false);
       abortRef.current = null;
@@ -170,7 +174,8 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
           ) : (
             <button className="mode-btn" onClick={stop}>停止</button>
           )}
-          <span className="tip">支持 .txt / .md；结果会先进入「提案中心」由你确认后再写入。</span>
+          <button className="mode-btn" onClick={() => useUIStore.getState().setAILog(true)}>AI 日志</button>
+          <span className="tip">支持 .txt / .md；结果会先进入「提案中心」由你确认后再写入。失败时自动打开 AI 日志查看模型回复。</span>
         </div>
 
         {error && <div className="art-error">{error}</div>}
