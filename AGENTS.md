@@ -1,4 +1,4 @@
-# CLAUDE.md — 浮光世界观编辑器 (Floating Light Worldbuilding Editor)
+# AGENTS.md — 浮光世界观编辑器 (Floating Light Worldbuilding Editor)
 
 本文件为在本仓库工作的 AI 助手提供项目背景、架构约定与工程红线。
 人工维护，请在本文件顶部追加变更，不要删除历史上下文。
