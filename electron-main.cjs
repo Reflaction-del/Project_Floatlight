@@ -24,9 +24,27 @@ const MIME = {
 function startServer() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
-      let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+      let urlPath;
+      try {
+        urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+      } catch {
+        res.writeHead(400);
+        res.end('bad request');
+        return;
+      }
       if (urlPath === '/') urlPath = '/index.html';
-      let filePath = path.join(DIST, urlPath);
+      // 路径穿越防护：拒绝含 '..' 的路径，并确保解析后的路径仍位于 DIST 内
+      if (urlPath.includes('..')) {
+        res.writeHead(403);
+        res.end('forbidden');
+        return;
+      }
+      let filePath = path.normalize(path.join(DIST, urlPath));
+      if (filePath !== DIST && !filePath.startsWith(DIST + path.sep)) {
+        res.writeHead(403);
+        res.end('forbidden');
+        return;
+      }
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
         filePath = path.join(DIST, 'index.html'); // SPA 回退
       }
