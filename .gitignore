@@ -48,6 +48,7 @@ venv_err.txt
 
 # Local project memory / tooling
 .workbuddy/
+.claude/
 
 # Vite temp files
 vite.config.ts.timestamp-*
