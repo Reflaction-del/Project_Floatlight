@@ -3,7 +3,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme } = require('electron');
+const crypto = require('crypto');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, session } = require('electron');
 
 const DIST = path.join(app.getAppPath(), 'dist');
 const PRELOAD = path.join(app.getAppPath(), 'preload.cjs');
@@ -21,9 +22,30 @@ const MIME = {
   '.woff': 'font/woff',
 };
 
+// —— 本机静态服务器访问令牌 ——
+// 令牌仅存于主进程内存，不落盘、不进 URL。服务器只响应携带该令牌的请求；
+// 令牌由 webRequest 在渲染进程每次请求时自动附加（见 app.whenReady 处的注册）。
+const SERVER_TOKEN = crypto.randomBytes(32).toString('hex');
+let serverPort = null; // 本机服务器当前端口，startServer 绑定后写入
+
+// 常量时间比较：避免时序侧信道逐字符猜出令牌（timingSafeEqual 长度不同会抛异常，先判长度）
+function safeEqual(provided, expected) {
+  const a = Buffer.from(String(provided));
+  const b = Buffer.from(String(expected));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 function startServer() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
+      // 访问令牌校验：只有携带正确令牌（应用自身渲染进程）的请求才会被响应
+      const provided = req.headers['x-floatlight-token'];
+      if (typeof provided !== 'string' || !safeEqual(provided, SERVER_TOKEN)) {
+        res.writeHead(403);
+        res.end('forbidden');
+        return;
+      }
       let urlPath;
       try {
         urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -59,7 +81,10 @@ function startServer() {
         res.end(data);
       });
     });
-    server.listen(0, '127.0.0.1', () => resolve(server.address().port));
+    server.listen(0, '127.0.0.1', () => {
+      serverPort = server.address().port;
+      resolve(serverPort);
+    });
   });
 }
 
@@ -686,6 +711,24 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // 注册一次（webRequest 监听器无法摘除，不可重复注册）：
+  // 把访问令牌附加到发往本机服务器的每个请求（首屏 loadURL、子资源、业务 fetch）。
+  // 过滤器匹配所有 127.0.0.1 端口，监听器内再按「目标端口 == 本项目服务器」精确判断，
+  // 确保令牌不会附加到用户自配的其它本地服务（如 Ollama 127.0.0.1:11434）。
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['http://127.0.0.1:*/'] },
+    (details, callback) => {
+      try {
+        const u = new URL(details.url);
+        if (u.host === `127.0.0.1:${serverPort}`) {
+          details.requestHeaders['X-Floatlight-Token'] = SERVER_TOKEN;
+        }
+      } catch {
+        // 无法解析的 URL 原样放行；监听器永远回调，避免请求挂起
+      }
+      callback({ requestHeaders: details.requestHeaders });
+    },
+  );
   winPrefs = readWinPrefs();
   Menu.setApplicationMenu(buildMenu());
   await createWindow();
