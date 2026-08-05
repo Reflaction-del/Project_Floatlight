@@ -672,6 +672,28 @@ async function createWindow() {
   });
   win.loadURL(`http://127.0.0.1:${port}/`);
 
+  // —— 安全加固：窗口打开与导航拦截 ——
+  // 渲染进程发起的任何新窗口请求一律拒绝：绝不创建继承 preload（window.api）的新
+  // BrowserWindow，否则外部网站可拿到 boot 快照（世界数据 + AI API Key）并读写存储目录。
+  // http/https 外部链接改为交给系统默认浏览器打开（shell.openExternal），其余协议静默拒绝。
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/i.test(url)) {
+      try { shell.openExternal(url); } catch { /* ignore */ }
+    }
+    return { action: 'deny' };
+  });
+  // 主窗口自身禁止被导航出应用源（http://127.0.0.1:<serverPort>），防止外部页面接管
+  // 应用窗口。SPA 内部视图切换为纯前端状态、无 URL 路由，不会触发本事件。
+  win.webContents.on('will-navigate', (event, url) => {
+    try {
+      const u = new URL(url);
+      if (u.protocol === 'http:' && u.hostname === '127.0.0.1' && u.port === String(serverPort)) {
+        return; // 应用自身源，放行
+      }
+    } catch { /* 无法解析的 URL 视为非法导航 */ }
+    event.preventDefault();
+  });
+
   // 修复：启动时窗口偶尔未在系统层面获得焦点，表现为「所有文本框无法输入，
   // 必须切走再切回应用才恢复」。加载完成后主动请求焦点（win + webContents 双重保险），
   // 并延时补一次，避免首帧焦点被系统吃掉的边界情况。
