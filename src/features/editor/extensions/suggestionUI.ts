@@ -28,7 +28,7 @@ export function makeRender() {
       items.forEach((item, i) => {
         const row = document.createElement('div');
         row.className = 'suggest-item' + (i === selected ? ' sel' : '');
-        row.innerHTML = `<span>${escapeHtml(item.label)}</span><span class="suggest-kind">${item.kind}</span>`;
+        row.innerHTML = `<span>${escapeHtml(item.label)}</span><span class="suggest-kind">${escapeHtml(item.kind)}</span>`;
         row.addEventListener('mousedown', (e) => {
           e.preventDefault();
           propsRef?.command(item);
@@ -116,7 +116,7 @@ export function makeEntityRender() {
       items.forEach((item, i) => {
         const row = document.createElement('div');
         row.className = 'suggest-item' + (i === selected ? ' sel' : '');
-        row.innerHTML = `<span>${escapeHtml(item.label)}</span><span class="suggest-kind">${item.kind}</span>`;
+        row.innerHTML = `<span>${escapeHtml(item.label)}</span><span class="suggest-kind">${escapeHtml(item.kind)}</span>`;
         row.addEventListener('mousedown', (e) => {
           e.preventDefault();
           propsRef?.command(item);

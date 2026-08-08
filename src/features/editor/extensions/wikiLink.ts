@@ -209,7 +209,7 @@ export const EntityAutocomplete = Extension.create({
       box.items.forEach((it, i) => {
         const row = document.createElement('div');
         row.className = 'suggest-item' + (i === box.selected ? ' sel' : '');
-        row.innerHTML = `<span>${escapeHtmlLocal(it.label)}</span><span class="suggest-kind">${it.kind}</span>`;
+        row.innerHTML = `<span>${escapeHtmlLocal(it.label)}</span><span class="suggest-kind">${escapeHtmlLocal(it.kind)}</span>`;
         row.addEventListener('mousedown', (e) => {
           e.preventDefault();
           applyItem(it);
