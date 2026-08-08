@@ -942,6 +942,64 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+/** ---- F9 修复：供应商返回的图片 URL 下载前做 SSRF 防护 ---- */
+
+/** IPv4 是否属于回环/私有/链路本地/保留段（含 0.0.0.0/8、组播、广播） */
+function isBlockedIpv4(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
+  const [a, b] = parts;
+  if (a === 0 || a === 10 || a === 127) return true; // 0/8、10/8、127/8 回环
+  if (a === 169 && b === 254) return true; // 169.254/16 链路本地
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12
+  if (a === 192 && b === 168) return true; // 192.168/16
+  if (a >= 224) return true; // 组播/保留
+  return false;
+}
+
+/** IPv6 是否属于回环/链路本地/唯一本地/组播/未指定（含 IPv4 映射/内嵌地址） */
+function isBlockedIpv6(ip: string): boolean {
+  const h = ip.toLowerCase();
+  if (h === '::' || h === '::1') return true;
+  // IPv4 映射/内嵌地址（::ffff:127.0.0.1 或 URL 解析器归一化后的 ::ffff:7f00:1）按 IPv4 判断
+  const v4tail = h.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (v4tail) return isBlockedIpv4(v4tail[1]);
+  const v4mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4mappedHex) {
+    const hi = parseInt(v4mappedHex[1], 16);
+    const lo = parseInt(v4mappedHex[2], 16);
+    return isBlockedIpv4(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  }
+  if (h.startsWith('fe8') || h.startsWith('fe9') || h.startsWith('fea') || h.startsWith('feb')) return true; // fe80::/10
+  if (h.startsWith('fc') || h.startsWith('fd')) return true; // fc00::/7 唯一本地
+  if (h.startsWith('ff')) return true; // 组播
+  return false;
+}
+
+/** 常见内网/本机主机名（渲染进程无法做 DNS 解析，按名拒绝） */
+const INTERNAL_HOSTNAMES = /(^|\.)(localhost|local|internal|lan|home|corp|intranet|metadata\.google\.internal)$/i;
+
+/** 校验供应商返回的图片 URL：仅允许 https: 或 data:image，且主机不得指向内网/回环 */
+function isSafeImageUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol === 'data:') return /^data:image\//i.test(raw);
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname;
+  if (INTERNAL_HOSTNAMES.test(host)) return false;
+  const ipv6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (ipv6.includes(':')) return !isBlockedIpv6(ipv6);
+  // 纯数字/十六进制主机名可能是 IP 的十进制/十六进制编码（部分解析器不归一化），一律拒绝
+  if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) return false;
+  // 仅当主机是标准 IPv4 字面量时才做 IP 段判断；主机名走上面的黑名单
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return !isBlockedIpv4(host);
+  return true;
+}
+
 export async function generateImage(opts: GenerateImageOpts): Promise<GenerateImageResult> {
   const model = opts.model ?? getCurrentModel();
   if (!model) {
@@ -986,7 +1044,12 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
       return { dataUrl: prefix + item.b64_json };
     }
     if (item.url) {
-      const imgResp = await fetch(item.url);
+      if (!isSafeImageUrl(item.url)) {
+        logAI({ level: 'error', phase: 'image', message: '图像生成返回的 url 不安全，已拒绝下载', detail: `POST ${url}\n模型：${model.model}`, raw: item.url });
+        throw new Error('图像生成返回的 url 不安全（仅允许 https 公网地址），已拒绝下载');
+      }
+      // redirect: 'error' —— 渲染进程无法读取重定向响应头做逐跳校验，禁止跟随重定向以阻断「重定向到内网」的 SSRF
+      const imgResp = await fetch(item.url, { redirect: 'error' });
       const blob = await imgResp.blob();
       return { dataUrl: await blobToDataUrl(blob), rawUrl: item.url };
     }
