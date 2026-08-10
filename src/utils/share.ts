@@ -154,7 +154,6 @@ export function buildShareHTML(payload: SharePayload): string {
 <script>
 const PAYLOAD = ${data};
 const LABEL = ${JSON.stringify(ENTITY_LABEL)};
-const LABEL = ${JSON.stringify(ENTITY_LABEL)};
 const RL = ${JSON.stringify(RELATION_LABEL)};
 const nameOf = (id) => (PAYLOAD.entities.find(e => e.id === id) || {}).name || '(未知)';
 
