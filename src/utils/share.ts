@@ -102,9 +102,18 @@ export function buildSharePayload(
   };
 }
 
+/**
+ * 将可序列化值安全嵌入 <script> 内联块：JSON.stringify 不转义 `<`，数据含 `</script>`
+ * 会提前闭合脚本标签导致注入。把每个 `<` 转义为 `\u003c`，运行时值不变（JS/JSON 会解码回 `<`），
+ * 但字面量 </script> 序列不再出现，从而阻断脚本上下文逃逸。
+ */
+function jsonToScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
 /** 生成一份独立、自包含的只读 HTML 查看器（接收方双击即可在浏览器查看，无需安装软件） */
 export function buildShareHTML(payload: SharePayload): string {
-  const data = JSON.stringify(payload);
+  const data = jsonToScript(payload);
   const headTitle = payload.title || `「${payload.world}」设定分享`;
   const headNote = payload.note || '';
   return `<!DOCTYPE html>
@@ -153,17 +162,17 @@ export function buildShareHTML(payload: SharePayload): string {
 </div>
 <script>
 const PAYLOAD = ${data};
-const LABEL = ${JSON.stringify(ENTITY_LABEL)};
-const RL = ${JSON.stringify(RELATION_LABEL)};
+const LABEL = ${jsonToScript(ENTITY_LABEL)};
+const RL = ${jsonToScript(RELATION_LABEL)};
 const nameOf = (id) => (PAYLOAD.entities.find(e => e.id === id) || {}).name || '(未知)';
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-document.getElementById('title').textContent = ${JSON.stringify(headTitle)};
+document.getElementById('title').textContent = ${jsonToScript(headTitle)};
 const meta = document.getElementById('meta');
 meta.innerHTML = '<span>世界：' + escapeHtml(PAYLOAD.world) + '</span><span>实体：' + PAYLOAD.entities.length + ' 个</span><span>关系：' + PAYLOAD.relations.length + ' 条</span>'
   + (PAYLOAD.scope.expireAt ? '<span class="expire-warn">有效期至 ' + new Date(PAYLOAD.scope.expireAt).toLocaleString() + '</span>' : '');
-document.getElementById('note').textContent = ${JSON.stringify(headNote)};
+document.getElementById('note').textContent = ${jsonToScript(headNote)};
 
 let activeType = 'all';
 const types = ['all', ...Array.from(new Set(PAYLOAD.entities.map(e => e.type)))];
