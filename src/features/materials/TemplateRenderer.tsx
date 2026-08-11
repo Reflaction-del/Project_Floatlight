@@ -18,6 +18,20 @@ import {
   getBuiltinIconPath, getShapePath, chartColors,
 } from './renderHelpers';
 
+/* ---------- 内联 SVG 安全渲染 ---------- */
+/**
+ * 内联 SVG 文本 → data:image/svg+xml;base64 图片 URL（用于签名印章渲染）。
+ * 经 <img> 加载的 SVG 处于「静态图片」模式：脚本不执行、on* 事件属性不触发、
+ * 外部资源不加载。因此以 <svg onload=...> 形式注入的存储型 XSS 被整体中和，
+ * 而合法的内联 SVG 印章仍可正常显示，与 dataURL 图片走同一条 <img> 渲染路径。
+ */
+function svgToImageDataUrl(svg: string): string {
+  const bytes = new TextEncoder().encode(svg);
+  let bin = '';
+  for (const byte of bytes) bin += String.fromCharCode(byte);
+  return `data:image/svg+xml;base64,${btoa(bin)}`;
+}
+
 /* ---------- 行内样式 ---------- */
 function groupStyle(b: Extract<Block, { type: 'group' }>, _token: StyleToken): React.CSSProperties {
   const base = {
@@ -129,7 +143,7 @@ function renderBlock(b: Block, ctx: RenderContext, key: string, highlightId?: st
           {b.label && <div style={{ fontSize: ctx.token.typography.labelSize, color: ctx.token.palette.muted, marginBottom: 2 }}>{b.label}</div>}
           {imageSrc ? (
             imageSrc.trim().startsWith('<svg')
-              ? <div dangerouslySetInnerHTML={{ __html: imageSrc }} style={{ height: imgH }} />
+              ? <img src={svgToImageDataUrl(imageSrc)} alt="" style={{ height: imgH, objectFit: 'contain' }} />
               : <img src={imageSrc} alt="" style={{ height: imgH, objectFit: 'contain' }} />
           ) : (
             <div style={{ fontFamily: ctx.token.signature.font, color: ctx.token.signature.color, fontStyle: ctx.token.signature.italic ? 'italic' : 'normal', fontSize: 20 }}>
