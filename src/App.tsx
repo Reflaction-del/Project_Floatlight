@@ -285,8 +285,25 @@ export default function App() {
     };
   }, []);
 
+  // 开发模式提示：浏览器环境（无 Electron 文件系统）数据存 localStorage，
+  // 与桌面版（文件）数据不互通——启动时打版本标记，便于日后识别数据来源。
+  const [browserMode] = useState(() => {
+    if (!storage.isNative()) {
+      try {
+        localStorage.setItem('fl-storage-ver', JSON.stringify({ mode: 'browser-local', ts: Date.now() }));
+      } catch { /* ignore */ }
+      return true;
+    }
+    return false;
+  });
+
   return (
     <div className="app-root">
+      {browserMode && (
+        <div className="dev-banner">
+          开发模式 · 数据存于浏览器 localStorage（与桌面版文件数据不互通，可用「导出 / 导入」迁移）
+        </div>
+      )}
       {titleBar === 'custom' && <TitleBar />}
       <div className={'shell' + (titleBar === 'custom' ? ' with-custom-titlebar' : '')}>
         <Toolbar />

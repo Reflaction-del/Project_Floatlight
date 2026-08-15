@@ -134,6 +134,19 @@ button {
 }
 
 /* ============ 四栏单行布局 ============ */
+/* 开发模式横幅：浏览器环境数据存 localStorage，提示与桌面版数据不互通 */
+.dev-banner {
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  background: #faeeda;
+  color: #633806;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  padding: 4px 12px;
+  border-bottom: 1px solid #ef9f27;
+}
 .shell {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
