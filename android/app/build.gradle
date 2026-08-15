@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 // 发布签名：读取本机 android/keystore.properties（已被 .gitignore 忽略，不入库）。
 // 文件缺失时回退 AGP debug 密钥库，保证未配置密码的环境也能构建（产物可侧载）。
 def keystoreProps = new Properties()
-def keystorePropFile = file('keystore.properties')
+def keystorePropFile = file('../keystore.properties') // 相对本模块(android/app) → android/keystore.properties
 if (keystorePropFile.exists()) {
     keystoreProps.load(new FileInputStream(keystorePropFile))
 }
