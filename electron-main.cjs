@@ -160,6 +160,7 @@ function startBridgeServer() {
       const requestId = crypto.randomBytes(12).toString('hex');
       const win = BrowserWindow.getAllWindows()[0];
       if (!win) return sendJson(500, { ok: false, error: 'no window' });
+      console.log('[bridge] forwarding request', requestId);
       // 转发渲染进程处理（有 AI 配置与草稿箱），30s 超时兜底
       const result = await new Promise((resolve) => {
         bridgePending.set(requestId, resolve);
@@ -191,6 +192,7 @@ ipcMain.handle('bridge:get-status', () => ({
 }));
 ipcMain.handle('bridge:set-enabled', (e, v) => { bridgeConfig.enabled = !!v; saveBridgeConfig(); return bridgeConfig.enabled; });
 ipcMain.handle('bridge:rotate-token', () => rotateBridgeToken());
+ipcMain.on('bridge:registered', (_e, info) => { console.log('[bridge] renderer:', info || 'listener registered'); });
 
 // 存储目录配置（位于用户数据目录下），可被设置界面覆盖
 const SAVE_CONFIG = path.join(app.getPath('userData'), 'fl-savedir.json');
@@ -474,7 +476,8 @@ function openHidden(w, h, scale) {
 function loadAndSettle(win, html) {
   return new Promise((resolve, reject) => {
     win.webContents.once('did-fail-load', (_e, _code, desc) => reject(new Error(desc || 'load failed')));
-    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => {
+    
+win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => {
       // 字体 / 内联图片解码需要一点延迟，350ms 足够离线场景
       setTimeout(resolve, 350);
     }).catch(reject);
@@ -786,6 +789,18 @@ async function createWindow() {
       preload: PRELOAD,
     },
   });
+  win.webContents.on('did-finish-load', () => console.log('[main] renderer did-finish-load'));
+  win.webContents.on('did-fail-load', (_e, code, desc) => console.log('[main] renderer did-fail-load', code, desc));
+  win.webContents.on('render-process-gone', (_e, details) => console.log('[main] renderer gone', JSON.stringify(details)));
+  // 渲染进程 console → 主进程 stdout（调试桥接/渲染错误；Electron 31 为对象签名）
+  // 兼容两种签名：Electron 31 旧 (level, message) / 新 (details 对象)
+  win.webContents.on('console-message', (_e, a, b) => {
+    const level = a && typeof a === 'object' ? a.level : a;
+    const message = a && typeof a === 'object' ? a.message : b;
+    if ((typeof message === 'string' && message.includes('[bridge]')) || level >= 2) {
+      console.log('[renderer:' + (level === 3 ? 'error' : 'log') + ']', message);
+    }
+  });
   win.loadURL(`http://127.0.0.1:${port}/`);
 
   // —— 安全加固：窗口打开与导航拦截 ——
@@ -854,7 +869,9 @@ app.whenReady().then(async () => {
   // 过滤器匹配所有 127.0.0.1 端口，监听器内再按「目标端口 == 本项目服务器」精确判断，
   // 确保令牌不会附加到用户自配的其它本地服务（如 Ollama 127.0.0.1:11434）。
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['http://127.0.0.1:*/'] },
+    // 注意：路径必须是 /* 才能覆盖子资源（/assets/*.js 等）；原 / 只匹配根路径，
+    // 导致子资源 403、渲染进程白屏（真实 bug，2026-08-15 修复）
+    { urls: ['http://127.0.0.1:*/*'] },
     (details, callback) => {
       try {
         const u = new URL(details.url);

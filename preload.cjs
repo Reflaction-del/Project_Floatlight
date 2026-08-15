@@ -2,7 +2,7 @@
 // 通过 contextBridge 向渲染进程暴露原生能力：插图选择、文件持久化、导入/导出对话框。
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('api', {
+const api = {
   // 插图：选择图片并以 dataURL 返回
   openImage: () => ipcRenderer.invoke('open-image'),
   // 启动时从磁盘拉取世界数据快照
@@ -57,10 +57,15 @@ contextBridge.exposeInMainWorld('api', {
   onBridgeIncoming: (cb) => {
     const handler = (_e, data) => cb(data);
     ipcRenderer.on('bridge:incoming', handler);
+    try { ipcRenderer.send('bridge:registered'); } catch { /* ignore */ }
     return () => ipcRenderer.removeListener('bridge:incoming', handler);
   },
   bridgeRespond: (requestId, result) => ipcRenderer.invoke('bridge:respond', requestId, result),
   bridgeGetStatus: () => ipcRenderer.invoke('bridge:get-status'),
   bridgeSetEnabled: (v) => ipcRenderer.invoke('bridge:set-enabled', v),
   bridgeRotateToken: () => ipcRenderer.invoke('bridge:rotate-token'),
-});
+};
+contextBridge.exposeInMainWorld('api', api);
+try {
+  ipcRenderer.send('bridge:registered', 'preload-exposed bridge:' + ['onBridgeIncoming', 'bridgeRespond', 'bridgeGetStatus', 'bridgeSetEnabled', 'bridgeRotateToken'].map((k) => k + '=' + typeof api[k]).join(' '));
+} catch (err) { ipcRenderer.send('bridge:registered', 'preload report error: ' + String(err)); }
