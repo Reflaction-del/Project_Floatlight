@@ -229,6 +229,18 @@ export function IconTrace(p: IconProps) {
   );
 }
 
+/* 跑团 — 骰子（Phase 4） */
+export function IconDice(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="7" y="7" width="10" height="10" rx="2.5" transform="rotate(45 12 12)" />
+      <circle cx="10.5" cy="10.5" r="0.9" />
+      <circle cx="12" cy="13.5" r="0.9" />
+      <circle cx="13.5" cy="10.5" r="0.9" />
+    </Svg>
+  );
+}
+
 /* 角色模拟 — 双人剪影（Phase 3） */
 export function IconSimulation(p: IconProps) {
   return (

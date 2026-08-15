@@ -22,7 +22,7 @@ export type EditorMode = 'preview' | 'split';
 interface OpenTabInput {
   title: string;
   icon?: string;
-  kind: 'doc' | 'module' | 'timeline' | 'drafts' | 'entity' | 'start' | 'outline' | 'simulation';
+  kind: 'doc' | 'module' | 'timeline' | 'drafts' | 'entity' | 'start' | 'outline' | 'simulation' | 'ttrpg';
   ref: string;
 }
 

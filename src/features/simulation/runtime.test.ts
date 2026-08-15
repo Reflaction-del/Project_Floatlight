@@ -14,7 +14,7 @@ const actor = (id: string, strategy: SubAgent['strategy'] = 'autonomous'): SubAg
   id, entityId: '林夜', role: 'protagonist', personaPrompt: '你是一名剑客。', memorySlot: [], strategy,
 });
 
-const world = () => ({ entities: [], relations: [], outline: [], timelines: [], docs: [], folders: [], styles: [], materials: [], templates: [], drafts: [], activeDocId: '', activeTimelineId: '', clueBoard: {}, proposals: [], chats: [], simulations: [], bridgeLog: [] }) as WorldData;
+const world = () => ({ entities: [], relations: [], outline: [], timelines: [], docs: [], folders: [], styles: [], materials: [], templates: [], drafts: [], activeDocId: '', activeTimelineId: '', clueBoard: {}, proposals: [], chats: [], simulations: [], bridgeLog: [], rulebooks: [], ttrpgSessions: [] }) as WorldData;
 
 const sim = (over: Partial<Simulation> = {}): Simulation =>
   newSimulation({ mode: 'sandbox', title: '测试', scenario: '雨夜', actors: [actor('a'), actor('b')], ...over });

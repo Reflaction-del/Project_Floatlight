@@ -24,6 +24,7 @@ import { OutlineView } from './features/outline/OutlineView';
 import { TracePanel } from './features/agent/TracePanel';
 import { SimulationView } from './features/simulation/SimulationView';
 import { initBridgeHandler } from './features/bridge/bridgeHandler';
+import { TTRPGView } from './features/ttrpg/TTRPGView';
 
 // 重型视图改为按需懒加载：首屏只加载外壳与轻量视图，物料生成器（含 qrcode /
 // canvas / svg 渲染链）、关系图（图布局）、一致性检查、分享、时间轴等仅在打开
@@ -125,6 +126,7 @@ function TabContent({ tab, mode }: { tab: TabItem; mode: EditorMode }) {
   if (tab.kind === 'drafts') return <DraftsView key={tab.ref} />;
   if (tab.kind === 'outline') return <OutlineView key={tab.ref} />;
   if (tab.kind === 'simulation') return <SimulationView key={tab.ref} />;
+  if (tab.kind === 'ttrpg') return <TTRPGView key={tab.ref} />;
   switch (tab.ref) {
     case 'materials':
       return <MaterialForgeView />;

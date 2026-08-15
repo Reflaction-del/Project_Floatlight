@@ -8,6 +8,7 @@ import type { OutlineNode } from '../features/outline/types';
 import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
 import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
 import type { BridgeEntry } from '../features/bridge/types';
+import type { Rulebook, TTRPGSession, SessionTurn } from '../features/ttrpg/types';
 import { newSimulation, pushEvent } from '../features/simulation/simOps';
 import type {
   DocFile,
@@ -74,6 +75,10 @@ export interface WorldData {
   }[];
   /** 聊天接入日志（Phase 3.5）：灵感消息留痕 */
   bridgeLog: BridgeEntry[];
+  /** 用户规则书（Phase 4a）：.fugurule 导入/新建；内置骨架为代码常量不持久化 */
+  rulebooks: Rulebook[];
+  /** 跑团会话（Phase 4a） */
+  ttrpgSessions: TTRPGSession[];
   activeDocId: string;
   activeTimelineId: string;
   /** M6 线索板设置 */
@@ -150,6 +155,14 @@ interface WorldState {
   deleteDraft: (id: string) => void;
   /* ——— 聊天接入日志（Phase 3.5） ——— */
   addBridgeEntry: (entry: BridgeEntry) => void;
+  /* ——— 跑团（Phase 4a） ——— */
+  addRulebook: (rb: Rulebook) => string;
+  updateRulebook: (id: string, patch: Partial<Rulebook>) => void;
+  deleteRulebook: (id: string) => void;
+  addTTRPGSession: (input: { mode: TTRPGSession['mode']; title: string; rulebookId: string; gmName?: string; players: TTRPGSession['players'] }) => string;
+  updateTTRPGSession: (id: string, patch: Partial<TTRPGSession>) => void;
+  deleteTTRPGSession: (id: string) => void;
+  appendTTRPGTurn: (id: string, turn: Omit<SessionTurn, 'id' | 'ts'>) => void;
   /* ——— 世界管理 ——— */
   /* —— 视觉物料生成器（P0-1d） —— */
   addStyle: (input: Omit<MaterialStyle, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -224,6 +237,8 @@ function emptyTemplate(): WorldData {
     outline: [],
     simulations: [],
     bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 function novelTemplate(): WorldData {
@@ -255,6 +270,8 @@ function novelTemplate(): WorldData {
     outline: [],
     simulations: [],
     bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 function scriptTemplate(): WorldData {
@@ -279,6 +296,8 @@ function scriptTemplate(): WorldData {
     outline: [],
     simulations: [],
     bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 
@@ -973,6 +992,8 @@ export const DEFAULT_DATA: WorldData = {
   outline: [],
     simulations: [],
     bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
 };
 
 let docSeq = 100;
@@ -1296,6 +1317,36 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       return id;
     },
     addBridgeEntry: (entry) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, bridgeLog: [...(wd.bridgeLog ?? []), entry].slice(-100) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    /* ——— 跑团（Phase 4a） ——— */
+    addRulebook: (rb) => {
+      const now = Date.now();
+      const id = rb.id || `rb-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: [...(wd.rulebooks ?? []), { ...rb, id, createdAt: now, updatedAt: now }] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateRulebook: (id, patch) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: (wd.rulebooks ?? []).map((r) => r.id === id ? { ...r, ...patch, id, updatedAt: Date.now() } : r) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    deleteRulebook: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: (wd.rulebooks ?? []).filter((r) => r.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    addTTRPGSession: (input) => {
+      const now = Date.now();
+      const id = `tt-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      const session: TTRPGSession = {
+        id, mode: input.mode, title: input.title || '未命名跑团', rulebookId: input.rulebookId,
+        gmName: input.gmName || 'GM', players: input.players ?? [], log: [], state: {}, createdAt: now, updatedAt: now,
+      };
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: [...(wd.ttrpgSessions ?? []), session] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateTTRPGSession: (id, patch) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).map((t) => t.id === id ? { ...t, ...patch, id, updatedAt: Date.now() } : t) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    deleteTTRPGSession: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).filter((t) => t.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    appendTTRPGTurn: (id, turn) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).map((t) => t.id === id ? { ...t, log: [...t.log, { ...turn, id: `tn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, ts: Date.now() }], updatedAt: Date.now() } : t) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     updateDraft: (id, title, content) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).map((d) => d.id === id ? { ...d, title, content } : d) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     deleteDraft: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).filter((d) => d.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     /* —— 世界管理 —— */
