@@ -1,6 +1,6 @@
 # 浮光 Agent 化 · 系统架构设计
 
-> 分支：`agent方向预览` ｜ 日期：2026-08-15 ｜ 状态：v1.2 评审稿（设计定稿，待确认问题已全部闭环）
+> 分支：`agent方向预览` ｜ 日期：2026-08-15 ｜ 状态：v1.3 评审稿（已并入执行轨迹 Trace 设计）
 > 参考：《织界 WorldForge 系统设计方案 v2》（`D:\世界观编辑器历史版本\worldforge-agent-system.md`）
 > 约束：**保留浮光现有全部功能**，纯本地自研数据层，逐步增量升级（非从零重写）
 
@@ -245,6 +245,42 @@ interface TTRPGSession {
 - `registerTool(name, {pre?, execute, post?})` + `ModeConfig` 声明装配；不引 YAML/Cordis。
 - 插件市场 v2：规则书（`.fugurule`） / 世界模板 / 导出（沿用 fugu* 纯本地导入导出，零在线依赖——与既有决策一致）。
 
+### 4.9 执行轨迹 Trace（借鉴 DeepSeek Harness Trajectory）
+**目标**：append-only 记录「模型看到的一切」——系统提示词、思维链、工具调用与结果、上下文注入、子 Agent 调度，提供可查看/可回放/可分叉的执行轨迹视图（用户已确认：独立文件存储、记录可开关默认全记、v1 含分叉+回放、独立面板与 AI 日志联动）。
+
+**分层定位**：AILogPanel = 传输层日志（HTTP 请求/状态/字符数，已有）；TracePanel = **语义层执行轨迹**（新增）。共用 `runId` 关联：每次顶层 AI 任务生成一个 runId，aiLog 记传输细节、trace 记语义步骤，轨迹内任意步可跳转查看对应传输日志。
+
+**数据模型**（独立侧车文件 `fl-traces.json`，不膨胀世界数据）：
+```ts
+interface TraceStore { version: 1; enabled: boolean; runs: TraceRun[] }  // enabled=记录开关，默认开
+interface TraceRun {
+  id: string; worldKey: string; sessionId?: string; title: string;      // 任务摘要（首条 user 截断）
+  source: 'chat'|'extract'|'linker'|'scene'|'template'|'subagent'|'propose'|'material';
+  modelId?: string; createdAt: number; updatedAt: number;
+  parentRunId?: string; forkFromStep?: number;   // 分叉溯源
+  steps: TraceStep[];                            // append-only
+}
+type TraceStepKind = 'user'|'assistant'|'reasoning'|'tool_call'|'tool_result'
+                   | 'context_inject'|'subagent'|'narrate'|'system';
+interface TraceStep {
+  seq: number; ts: number; kind: TraceStepKind;
+  summary: string;                               // 一行摘要（列表视图）
+  detail?: string;                               // 完整内容（展开：工具参数/结果/注入上下文）
+  tool?: { name: string; args?: unknown; result?: unknown; durationMs?: number; ok?: boolean };
+  runId?: string;                                // 子代理调度指向子 run
+}
+```
+
+**采集点**（TraceCollector，与 aiLog 同款 pub/sub 总线扩展）：`chatWithTools` 循环（每轮 assistant+reasoning、每次 tool_call、每次 tool_result）、`chatOnce`/`chatVision`、上下文注入（worldContext 打包 → context_inject）、提案生成入口（system 摘要）、未来 SubAgent 行动（subagent + runId）。
+
+**UI（TracePanel 独立面板）**：run 列表（倒序，标题/来源/模型/步数）→ 时间线步骤卡片，**按来源着色**（tool_call=橙、context_inject=绿、reasoning=紫、assistant=蓝、user=灰，对齐 Harness 视觉）→ 展开/折叠 detail、按 kind/轮次筛选 → 播放控制回放（逐步推进）→ 「从此分叉」。
+
+**分叉语义**：分叉点限定在 user/assistant/tool_result 边界（保证上下文完整）→ 复制事件前缀 + 关联 ChatSession 消息截断到该步 → 生成新 run（`parentRunId` 溯源，父 run 不变）→ 以分叉上下文继续对话，独立演进。
+
+**防膨胀**：单 run 步数上限（500 步截断+提示）、run 数量滚动上限（保留最近 200）、独立文件不参与 worldStore dirty/保存流程（专用节流写入）。记录开关在「设置 → AI」处切换。
+
+**落地位置**：Phase 1.5（可观测底座，随 Phase 2 编排落地前就绪）；单测守护 fork 截断/seq 递增/开关逻辑（vitest）。
+
 ---
 
 ## 5. 数据模型扩展（WorldData diff）
@@ -294,6 +330,7 @@ interface BridgeEntry {
 | **0** ✅ | 基座（已有） | 提案队列 / chats / 安全基线 / 主动提议 v1 | — | — |
 | **1** | 认知基础 | ① 大纲数据模型 + 大纲视图（任意深度树、关联文档/时间线）② 世界快照打包器 `buildWorldSnapshot` ③ 三级记忆调度 | 大纲任意深度增删改/拖拽；快照可灌入任意 AI 调用且 token 可控 | 0 |
 | **2** | 单 Agent 编排 | ① 工具注册表（现有功能收敛为 Service）② Agent Loop（响应式）+ Planner（规划式）③ AI 侧栏升级为「协作者」 | 一个自然语言指令可连续完成「抽取→查重→提案」多步任务 | 1 |
+| **1.5** | 执行轨迹 Trace（可与 1/2 并行） | ① TraceStore（fl-traces.json 独立文件+记录开关）② 采集点接入 chatWithTools/chatOnce/上下文注入 ③ TracePanel（着色时间线/筛选/回放）④ 分叉（fork）与传输日志联动 | 一次带工具调用任务可完整回放；从任意步分叉出新 run 并继续对话 | 0（依赖现有 chatWithTools/aiLog） |
 | **3** | 多子代理 · 角色模拟 | ① SubAgent 运行时（每角色独立模型+人格词）+ 串行队列 ② 沙盘视图 ③ 观察式/导演式 + pacing 节奏 + 时间尺度推演 ④ 一致性/预算护栏 | 多角色自主推进 ≥10 步无矛盾；时间尺度推演产出可采纳落时间线 | 2 |
 | **3.5** | 聊天接入（可与 3 并行） | ① 本地桥接 API（回环+令牌+限流）② 灵感整理管线（结构化/直存可选）③ 桥接管理面板 + AstrBot 插件参考实现 | 外部框架推一条消息 → 草稿箱出现带来源标记的草稿 | 2 |
 | **4** | 跑团引擎 · LAN 多人 | ① 规则引擎 + 三套骨架规则书（检定公式可编辑）② AI-GM / 全自动双模式 ③ LAN WS 服务 + 房间管理（远程玩家装应用加入）④ 跑团视图 | 本地单机跑通 AI-GM 一场；两台机器应用实例同房间参与 | 3 |
@@ -311,6 +348,7 @@ interface BridgeEntry {
 | 观察式沙盘自主失控/跑偏 | 最大步数 + 每轮「叙事者汇总」+ 用户随时暂停/插话 + pacing 可选 |
 | Agent 擅自写设定 | 提案队列唯一写入口（不可绕过）；provenance 溯源 |
 | 大纲/事件流数据膨胀 | 事件流滚动截断 + 摘要沉淀到实体/大纲 |
+| **轨迹数据膨胀** | 独立侧车文件 + 单 run 500 步上限 + 200 run 滚动上限 + 记录开关 |
 | **LAN 服务被滥用** | 仅局域网绑定 + 随机令牌 + 房间码 + 无公网暴露（dev 安全基线） |
 | **聊天桥接被滥用/注入** | 仅回环绑定 + 令牌 + 限流；聊天文本视作外部输入：进草稿箱前过 sanitizeHtml（已有消毒器）；不做任何网络暴露 |
 | **规则书版权风险** | 只内置框架骨架，不内置商业 IP 完整规则；完整规则书由用户导入 |

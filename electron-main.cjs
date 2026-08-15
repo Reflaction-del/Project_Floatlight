@@ -148,6 +148,18 @@ function atomicWriteFile(targetPath, content) {
   fs.renameSync(tmpPath, targetPath);
 }
 
+// —— 磁盘写串行化 ——
+// 渲染进程多个 store 可能并发发起写盘（世界数据 / AI 配置 / 导出等），
+// LAN 跑团上线后远程实例的写也会汇入同一入口。所有磁盘写统一经本队列
+// 串行执行：前一任务完成才执行下一个，保证顺序与原子性，避免写交错 / 半写。
+// 用法：把「真正落盘的同步/异步操作」包进 enqueueWrite，返回值透传给 IPC 调用方。
+let writeQueue = Promise.resolve();
+function enqueueWrite(fn) {
+  const run = writeQueue.then(fn, fn); // 前一任务失败不阻断后续
+  writeQueue = run.catch(() => {});
+  return run;
+}
+
 function readJson(f) {
   const p = path.join(getSaveDir(), f);
   let raw = null;
@@ -186,10 +198,10 @@ ipcMain.handle('boot', () => {
   };
 });
 
-// 渲染进程写入存储目录下的文件（原子写，见 atomicWriteFile）
+// 渲染进程写入存储目录下的文件（原子写，见 atomicWriteFile；经串行队列防并发交错）
 ipcMain.handle('fs-write-file', (e, name, content) => {
   const dir = ensureDir(getSaveDir());
-  atomicWriteFile(path.join(dir, safeName(name)), content);
+  return enqueueWrite(() => atomicWriteFile(path.join(dir, safeName(name)), content));
 });
 
 // 渲染进程读取存储目录下的文件（用于加载语义索引等侧车文件）
@@ -233,10 +245,12 @@ function migrateSaveDir(oldDir, newDir) {
 ipcMain.handle('fs-set-save-dir', (e, dir) => {
   const oldDir = getSaveDir();
   const d = ensureDir(dir);
-  // 先迁移，再保存配置：保证新目录立即包含完整历史数据
-  migrateSaveDir(oldDir, d);
-  try { fs.writeFileSync(SAVE_CONFIG, JSON.stringify({ dir: d })); } catch { /* ignore */ }
-  return d;
+  // 先迁移，再保存配置：保证新目录立即包含完整历史数据（迁移+配置写入经串行队列）
+  return enqueueWrite(() => {
+    migrateSaveDir(oldDir, d);
+    try { fs.writeFileSync(SAVE_CONFIG, JSON.stringify({ dir: d })); } catch { /* ignore */ }
+    return d;
+  });
 });
 
 // 导入：系统文件选择器
@@ -262,7 +276,7 @@ ipcMain.handle('fs-export', async (e, defaultName, content) => {
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
   if (canceled || !filePath) return false;
-  try { fs.writeFileSync(filePath, String(content)); return true; } catch { return false; }
+  return enqueueWrite(() => { try { fs.writeFileSync(filePath, String(content)); return true; } catch { return false; } });
 });
 
 // 唤起系统文件选择器，读取图片并以 dataURL 返回
@@ -332,8 +346,7 @@ ipcMain.handle('export-pdf', async (e, htmlContent, title) => {
       filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, pdfData);
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, pdfData); return true; });
   } catch (err) {
     console.error('[export-pdf]', err);
     return false;
@@ -385,8 +398,7 @@ ipcMain.handle('material:export-preview', async (_e, rect, defaultName = 'previe
       filters: [{ name: 'PNG 图片', extensions: ['png'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, image.toPNG());
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, image.toPNG()); return true; });
   } catch (err) {
     console.error('[material:export-preview]', err);
     return false;
@@ -424,8 +436,7 @@ ipcMain.handle('material:export-png', async (_e, html, opts) => {
       filters: [{ name: 'PNG 图片', extensions: ['png'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, png.toPNG());
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, png.toPNG()); return true; });
   } catch (err) {
     console.error('[material:export-png]', err);
     return false;
@@ -453,8 +464,7 @@ ipcMain.handle('material:export-pdf', async (_e, html, opts) => {
       filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, buf);
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, buf); return true; });
   } catch (err) {
     console.error('[material:export-pdf]', err);
     return false;
@@ -471,34 +481,36 @@ ipcMain.handle('material:pick-folder', async () => {
   if (canceled || !filePaths.length) return null;
   return filePaths[0];
 });
-// 批量写入 PNG 序列 + manifest.json（零新依赖，直接落盘）
-ipcMain.handle('material:export-batch', async (_e, folder, items) => {
-  try {
-    if (!folder || !Array.isArray(items)) return { written: 0, folder: null };
-    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
-    let written = 0;
-    for (const it of items) {
-      const m = /^data:image\/png;base64,(.+)$/.exec(it.dataUrl || '');
-      if (!m) continue;
-      const name = safeName(it.filename || `item-${written + 1}`) + '.png';
-      fs.writeFileSync(path.join(folder, name), Buffer.from(m[1], 'base64'));
-      written++;
+// 批量写入 PNG 序列 + manifest.json（零新依赖，直接落盘；整体作为一个串行写任务）
+ipcMain.handle('material:export-batch', (_e, folder, items) => {
+  return enqueueWrite(() => {
+    try {
+      if (!folder || !Array.isArray(items)) return { written: 0, folder: null };
+      if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+      let written = 0;
+      for (const it of items) {
+        const m = /^data:image\/png;base64,(.+)$/.exec(it.dataUrl || '');
+        if (!m) continue;
+        const name = safeName(it.filename || `item-${written + 1}`) + '.png';
+        fs.writeFileSync(path.join(folder, name), Buffer.from(m[1], 'base64'));
+        written++;
+      }
+      const manifest = {
+        generatedAt: new Date().toISOString(),
+        count: written,
+        items: items.map((it) => ({
+          filename: safeName(it.filename || '') + '.png',
+          entityId: it.entityId ?? '',
+          entityName: it.entityName ?? '',
+        })),
+      };
+      fs.writeFileSync(path.join(folder, 'manifest.json'), JSON.stringify(manifest, null, 2));
+      return { written, folder };
+    } catch (err) {
+      console.error('[material:export-batch]', err);
+      return { written: 0, folder: null, error: String(err) };
     }
-    const manifest = {
-      generatedAt: new Date().toISOString(),
-      count: written,
-      items: items.map((it) => ({
-        filename: safeName(it.filename || '') + '.png',
-        entityId: it.entityId ?? '',
-        entityName: it.entityName ?? '',
-      })),
-    };
-    fs.writeFileSync(path.join(folder, 'manifest.json'), JSON.stringify(manifest, null, 2));
-    return { written, folder };
-  } catch (err) {
-    console.error('[material:export-batch]', err);
-    return { written: 0, folder: null, error: String(err) };
-  }
+  });
 });
 
 // 动态更新窗口标题栏背景色（跟随主题切换）
