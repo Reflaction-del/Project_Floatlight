@@ -88,6 +88,110 @@ function startServer() {
   });
 }
 
+// —— 聊天接入桥接服务（Phase 3.5）——
+// 本地 HTTP API（仅回环 127.0.0.1 + Bearer 令牌 + 限流），供外部机器人框架
+// （AstrBot 等）转发聊天消息：POST /api/v1/inspiration。平台无关，适配在外部。
+// 令牌持久化到 userData/fl-bridge.json（仅本机），可轮换。enabled=false 时返回 503。
+const BRIDGE_CONFIG_FILE = path.join(app.getPath('userData'), 'fl-bridge.json');
+let bridgeConfig = { enabled: true, token: '', port: 0 };
+const bridgePending = new Map(); // requestId -> resolve
+const BRIDGE_RATE_WINDOW_MS = 60 * 1000;
+const BRIDGE_RATE_LIMIT = 120;
+let bridgeHits = [];
+
+function loadBridgeConfig() {
+  try {
+    const c = JSON.parse(fs.readFileSync(BRIDGE_CONFIG_FILE, 'utf8'));
+    if (c && typeof c.token === 'string' && c.token.length >= 16) {
+      bridgeConfig = { enabled: c.enabled !== false, token: c.token, port: c.port || 0 };
+      return;
+    }
+  } catch { /* 首启生成 */ }
+  bridgeConfig.token = crypto.randomBytes(24).toString('hex');
+  saveBridgeConfig();
+}
+function saveBridgeConfig() {
+  try { fs.writeFileSync(BRIDGE_CONFIG_FILE, JSON.stringify(bridgeConfig)); } catch { /* ignore */ }
+}
+function rotateBridgeToken() {
+  bridgeConfig.token = crypto.randomBytes(24).toString('hex');
+  saveBridgeConfig();
+  return bridgeConfig.token;
+}
+function bridgeRateLimited() {
+  const now = Date.now();
+  bridgeHits = bridgeHits.filter((t) => now - t < BRIDGE_RATE_WINDOW_MS);
+  if (bridgeHits.length >= BRIDGE_RATE_LIMIT) return true;
+  bridgeHits.push(now);
+  return false;
+}
+function startBridgeServer() {
+  const server = http.createServer((req, res) => {
+    const sendJson = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(obj));
+    };
+    if (req.method !== 'POST' || (req.url || '').split('?')[0] !== '/api/v1/inspiration') {
+      return sendJson(404, { ok: false, error: 'not found' });
+    }
+    if (!bridgeConfig.enabled) return sendJson(503, { ok: false, error: 'bridge disabled' });
+    const auth = req.headers.authorization || '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!bridgeConfig.token || !safeEqual(provided, bridgeConfig.token)) {
+      return sendJson(401, { ok: false, error: 'unauthorized' });
+    }
+    if (bridgeRateLimited()) return sendJson(429, { ok: false, error: 'rate limited' });
+
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 65536) req.destroy(); });
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body || '{}'); } catch { return sendJson(400, { ok: false, error: 'bad json' }); }
+      const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+      if (!text) return sendJson(400, { ok: false, error: 'empty text' });
+      const clean = {
+        platform: String(payload.platform || 'webhook'),
+        chatId: String(payload.chatId || ''),
+        userId: String(payload.userId || ''),
+        nickname: String(payload.nickname || ''),
+        text,
+        ts: typeof payload.ts === 'number' ? payload.ts : Date.now(),
+      };
+      const requestId = crypto.randomBytes(12).toString('hex');
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win) return sendJson(500, { ok: false, error: 'no window' });
+      // 转发渲染进程处理（有 AI 配置与草稿箱），30s 超时兜底
+      const result = await new Promise((resolve) => {
+        bridgePending.set(requestId, resolve);
+        win.webContents.send('bridge:incoming', { requestId, payload: clean });
+        setTimeout(() => {
+          if (bridgePending.has(requestId)) {
+            bridgePending.delete(requestId);
+            resolve({ ok: false, error: 'renderer timeout' });
+          }
+        }, 30000);
+      });
+      sendJson(200, result);
+    });
+  });
+  server.listen(0, '127.0.0.1', () => {
+    bridgeConfig.port = server.address().port;
+    saveBridgeConfig();
+  });
+}
+
+ipcMain.handle('bridge:respond', (e, requestId, result) => {
+  const resolve = bridgePending.get(requestId);
+  if (resolve) { bridgePending.delete(requestId); resolve(result || { ok: false, error: 'no result' }); }
+});
+ipcMain.handle('bridge:get-status', () => ({
+  enabled: bridgeConfig.enabled,
+  port: bridgeConfig.port,
+  token: bridgeConfig.token,
+}));
+ipcMain.handle('bridge:set-enabled', (e, v) => { bridgeConfig.enabled = !!v; saveBridgeConfig(); return bridgeConfig.enabled; });
+ipcMain.handle('bridge:rotate-token', () => rotateBridgeToken());
+
 // 存储目录配置（位于用户数据目录下），可被设置界面覆盖
 const SAVE_CONFIG = path.join(app.getPath('userData'), 'fl-savedir.json');
 
@@ -765,6 +869,8 @@ app.whenReady().then(async () => {
   );
   winPrefs = readWinPrefs();
   Menu.setApplicationMenu(buildMenu());
+  loadBridgeConfig();
+  startBridgeServer();
   await createWindow();
 });
 

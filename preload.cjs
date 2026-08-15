@@ -53,4 +53,14 @@ contextBridge.exposeInMainWorld('api', {
   pickFolder: () => ipcRenderer.invoke('material:pick-folder'),
   // 视觉物料生成器：批量写入 PNG 序列 + manifest.json
   materialExportBatch: (folder, items) => ipcRenderer.invoke('material:export-batch', folder, items),
+  // 聊天接入（Phase 3.5）：监听灵感消息 + 回执 + 桥接状态管理
+  onBridgeIncoming: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('bridge:incoming', handler);
+    return () => ipcRenderer.removeListener('bridge:incoming', handler);
+  },
+  bridgeRespond: (requestId, result) => ipcRenderer.invoke('bridge:respond', requestId, result),
+  bridgeGetStatus: () => ipcRenderer.invoke('bridge:get-status'),
+  bridgeSetEnabled: (v) => ipcRenderer.invoke('bridge:set-enabled', v),
+  bridgeRotateToken: () => ipcRenderer.invoke('bridge:rotate-token'),
 });

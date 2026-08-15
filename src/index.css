@@ -3867,3 +3867,13 @@ button:active,
   color: var(--fg);
 }
 .ai-log-raw { color: var(--fg-muted); }
+
+/* ============ 聊天接入设置（Phase 3.5） ============ */
+.set-bridge-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+.set-bridge-switch { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.set-bridge-token { font-size: 12px; background: var(--bg-soft, #f0f2f5); padding: 2px 8px; border-radius: 6px; }
+.set-bridge-curl { background: #1f2430; color: #d6e2f0; padding: 10px 12px; border-radius: 8px; font-size: 11.5px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+.set-bridge-result { background: var(--bg-soft, #f0f2f5); padding: 8px 10px; border-radius: 8px; font-size: 11.5px; white-space: pre-wrap; }
+.set-bridge-log { max-height: 200px; overflow-y: auto; }
+.set-bridge-log-item { padding: 6px 8px; border-left: 3px solid var(--border); margin: 4px 0; background: var(--bg-soft, #fafbfc); border-radius: 0 6px 6px 0; }
+.set-bridge-log-text { font-size: 12.5px; margin: 2px 0; }

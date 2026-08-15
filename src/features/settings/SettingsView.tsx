@@ -8,6 +8,7 @@ import { useUIStore } from '../../store/uiStore';
 import { getStartPageEnabled, setStartPageEnabled } from './startPageSetting';
 import { storage } from '../../storage';
 import { AIUsagePanel } from './AIUsagePanel';
+import { BridgeSettingsSection } from '../bridge/BridgeSettingsSection';
 import { worldToMarkdown } from '../../utils/markdown';
 import { testConnection, listModels, embedTexts } from '../../utils/ai';
 import { rebuildIndexDelta, clearIndex, getIndexStats } from '../../utils/embeddingIndex';
@@ -636,6 +637,8 @@ export function SettingsView() {
           <h3>AI 用量中心</h3>
           <AIUsagePanel />
         </section>
+
+        <BridgeSettingsSection />
 
         <section className="set-section">
           <h3>导出 / 导入</h3>

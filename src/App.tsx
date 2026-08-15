@@ -23,6 +23,7 @@ import { StartPage } from './components/StartPage';
 import { OutlineView } from './features/outline/OutlineView';
 import { TracePanel } from './features/agent/TracePanel';
 import { SimulationView } from './features/simulation/SimulationView';
+import { initBridgeHandler } from './features/bridge/bridgeHandler';
 
 // 重型视图改为按需懒加载：首屏只加载外壳与轻量视图，物料生成器（含 qrcode /
 // canvas / svg 渲染链）、关系图（图布局）、一致性检查、分享、时间轴等仅在打开
@@ -195,6 +196,9 @@ export default function App() {
   const copilotOpen = useUIStore((s) => s.copilotOpen);
   const firstRun = useWorldviewStore((s) => s.firstRun);
   const [titleBar, setTitleBar] = useState(appPrefs.titleBar);
+
+  // 聊天接入（Phase 3.5）：注册桥接灵感监听（主进程转发 HTTP → 渲染进程处理）
+  useEffect(() => { initBridgeHandler(); }, []);
 
   // 启动时与主进程实际窗口模式校准（自定义标题栏需 frameless）
   useEffect(() => {

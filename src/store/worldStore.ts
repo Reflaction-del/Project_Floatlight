@@ -7,6 +7,7 @@ import type { Proposal, ChatSession } from './proposalTypes';
 import type { OutlineNode } from '../features/outline/types';
 import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
 import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
+import type { BridgeEntry } from '../features/bridge/types';
 import { newSimulation, pushEvent } from '../features/simulation/simOps';
 import type {
   DocFile,
@@ -59,8 +60,20 @@ export interface WorldData {
   entities: WikiEntity[];
   /** M2 实体关系 */
   relations: WikiRelation[];
-  /** 草稿箱（手动快记） */
-  drafts: { id: string; title: string; content: string; createdAt: number }[];
+  /** 草稿箱（手动快记 / 聊天接入灵感） */
+  drafts: {
+    id: string;
+    title: string;
+    content: string;
+    createdAt: number;
+    /** 来源标记（聊天平台灵感，可选） */
+    source?: { platform: string; userId: string; nickname: string; ts: number };
+    tags?: string[];
+    /** 推荐挂载的大纲节点（仅元数据，不自动挂载） */
+    outlineHint?: { id: string; title: string };
+  }[];
+  /** 聊天接入日志（Phase 3.5）：灵感消息留痕 */
+  bridgeLog: BridgeEntry[];
   activeDocId: string;
   activeTimelineId: string;
   /** M6 线索板设置 */
@@ -131,8 +144,12 @@ interface WorldState {
   setClueBoardBackgroundScale: (scale: number) => void;
   /* ——— 草稿箱 ——— */
   addDraft: (title: string, content: string) => void;
+  /** 扩展添加（聊天接入灵感：带来源标记/标签/大纲推荐） */
+  addDraftEx: (input: { title: string; content: string; source?: { platform: string; userId: string; nickname: string; ts: number }; tags?: string[]; outlineHint?: { id: string; title: string } }) => string;
   updateDraft: (id: string, title: string, content: string) => void;
   deleteDraft: (id: string) => void;
+  /* ——— 聊天接入日志（Phase 3.5） ——— */
+  addBridgeEntry: (entry: BridgeEntry) => void;
   /* ——— 世界管理 ——— */
   /* —— 视觉物料生成器（P0-1d） —— */
   addStyle: (input: Omit<MaterialStyle, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -206,6 +223,7 @@ function emptyTemplate(): WorldData {
     chats: [],
     outline: [],
     simulations: [],
+    bridgeLog: [],
   };
 }
 function novelTemplate(): WorldData {
@@ -236,6 +254,7 @@ function novelTemplate(): WorldData {
     chats: [],
     outline: [],
     simulations: [],
+    bridgeLog: [],
   };
 }
 function scriptTemplate(): WorldData {
@@ -259,6 +278,7 @@ function scriptTemplate(): WorldData {
     chats: [],
     outline: [],
     simulations: [],
+    bridgeLog: [],
   };
 }
 
@@ -952,6 +972,7 @@ export const DEFAULT_DATA: WorldData = {
   chats: [],
   outline: [],
     simulations: [],
+    bridgeLog: [],
 };
 
 let docSeq = 100;
@@ -1265,6 +1286,16 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       });
     },
     addDraft: (title, content) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const id = `df-${Date.now()}-${Math.random().toString(36).slice(2,6)}`; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: [...(wd.drafts ?? []), { id, title, content, createdAt: Date.now() }] } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    addDraftEx: (input) => {
+      const id = `df-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: [...(wd.drafts ?? []), { id, title: input.title, content: input.content, createdAt: Date.now(), source: input.source, tags: input.tags, outlineHint: input.outlineHint }] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    addBridgeEntry: (entry) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, bridgeLog: [...(wd.bridgeLog ?? []), entry].slice(-100) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     updateDraft: (id, title, content) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).map((d) => d.id === id ? { ...d, title, content } : d) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     deleteDraft: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).filter((d) => d.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     /* —— 世界管理 —— */
