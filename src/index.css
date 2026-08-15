@@ -3668,6 +3668,52 @@ button:active,
 .ol-assoc { display: flex; align-items: center; gap: 8px; padding: 8px 0 4px; border-top: 1px solid var(--border); }
 .ol-select { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; max-width: 260px; }
 
+/* ============ 执行轨迹面板（Phase 1.5） ============ */
+.trace-modal { width: 860px; max-width: 94vw; height: 78vh; display: flex; flex-direction: column; }
+.trace-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.trace-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.trace-head .tip { flex: 1; font-size: 12px; color: var(--fg-muted); }
+.trace-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--fg-muted); }
+.trace-body { display: flex; gap: 12px; flex: 1; min-height: 0; margin-top: 10px; }
+.trace-runs { width: 260px; flex-shrink: 0; border-right: 1px solid var(--border); overflow-y: auto; padding-right: 8px; }
+.trace-runs-title { font-size: 12px; font-weight: 700; color: var(--fg-muted); margin-bottom: 6px; }
+.trace-empty { color: var(--fg-muted); font-size: 12.5px; padding: 24px 8px; line-height: 1.6; }
+.trace-run { padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 6px; }
+.trace-run:hover { background: var(--bg-soft, #f5f7fa); }
+.trace-run.active { background: var(--bg-soft, #eef1f6); outline: 1px solid var(--accent); }
+.trace-run-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.trace-run-meta { font-size: 11px; color: var(--fg-muted); margin-top: 2px; }
+.trace-fork-tag { font-size: 10px; font-weight: 600; color: #854f0b; background: #faeeda; padding: 1px 6px; border-radius: 999px; }
+.trace-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.trace-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.trace-detail-head .tip { flex: 1; font-size: 12px; color: var(--fg-muted); }
+.trace-filters { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.trace-kind { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--fg-muted); cursor: pointer; }
+.trace-kind.on { color: inherit; }
+.trace-steps { flex: 1; overflow-y: auto; padding-right: 4px; }
+.trace-step {
+  position: relative; border-left: 3px solid var(--border); padding: 6px 8px 6px 12px; margin-bottom: 4px;
+  border-radius: 0 8px 8px 0;
+}
+.trace-step.playing { background: var(--bg-soft, #f0f4fa); outline: 1px solid var(--accent); }
+.trace-step-main { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.trace-step-kind { flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--bg-soft, #eef1f6); color: var(--fg-muted); }
+.trace-step-summary { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-step-ts { flex-shrink: 0; font-size: 10.5px; color: var(--fg-muted); }
+.trace-step-detail { margin: 6px 0 2px; padding: 8px 10px; background: var(--bg-soft, #f5f7fa); border-radius: 8px; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow-y: auto; }
+.trace-step-ops { position: absolute; right: 8px; top: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.trace-step:hover .trace-step-ops { opacity: 1; }
+/* 按来源着色（对齐 Harness：tool=橙 / context=绿 / reasoning=紫 / assistant=蓝 / user=灰） */
+.trace-step.st-user { border-color: #888780; }
+.trace-step.st-assistant { border-color: #378add; }
+.trace-step.st-reasoning { border-color: #7f77dd; }
+.trace-step.st-tool_call { border-color: #d85a30; }
+.trace-step.st-tool_result { border-color: #1d9e75; }
+.trace-step.st-context_inject { border-color: #639922; }
+.trace-step.st-system { border-color: #888780; }
+.trace-step.st-subagent { border-color: #7f77dd; }
+.trace-step.st-narrate { border-color: #378add; }
+
 /* ============ AI 调用日志窗口（进度窗口） ============ */
 .ai-log-modal {
   width: min(760px, 94vw);

@@ -218,6 +218,17 @@ export function IconOutline(p: IconProps) {
   );
 }
 
+/* 执行轨迹 — 波形线（Phase 1.5） */
+export function IconTrace(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M3 18c3-6 6 6 9 0s6-6 9 0" />
+      <circle cx="3" cy="18" r="1.5" />
+      <circle cx="21" cy="18" r="1.5" />
+    </Svg>
+  );
+}
+
 /* ===== 编辑器右键菜单专用图标 ===== */
 
 /* 从选区新建实体 — 方框加号 */

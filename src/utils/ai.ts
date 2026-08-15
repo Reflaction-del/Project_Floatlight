@@ -511,6 +511,10 @@ export interface ChatOnceOpts {
   maxTokens?: number;
   /** 用量中心统计场景 */
   feature?: AIUsageFeature;
+  /** 执行轨迹采集（Phase 1.5）：每轮模型回复（含请求的工具调用），渐进增强不影响现有调用 */
+  onTurn?: (turn: number, info: { content: string; toolCalls: { name: string; args: unknown }[] }) => void;
+  /** 每次工具执行完成（name, args, result） */
+  onToolResult?: (name: string, args: unknown, result: string) => void;
 }
 
 /** 非流式 simple chat —— 网络与 JSON 解析均在 Worker 线程执行（见 runCompleteInWorker），
@@ -854,6 +858,14 @@ export async function chatWithTools(
     }
     const raw = await readAllText(resp);
     const msg = parseMessageFromBody(raw);
+    // 执行轨迹采集：每轮模型产出（含请求的工具）
+    opts?.onTurn?.(turn, {
+      content: msg.content ?? '',
+      toolCalls: (msg.tool_calls ?? []).map((tc) => ({
+        name: tc.function.name,
+        args: safeParseArgs(tc.function.arguments || '{}'),
+      })),
+    });
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
       logAI({
         level: 'ok',
@@ -878,13 +890,15 @@ export async function chatWithTools(
     });
     for (const tc of msg.tool_calls) {
       let result: string;
+      let args: Record<string, unknown> = {};
       try {
-        const args = safeParseArgs(tc.function.arguments || '{}');
+        args = safeParseArgs(tc.function.arguments || '{}');
         const r = ctx.callTool(tc.function.name, args);
         result = await r;
       } catch (e: any) {
         result = '工具执行出错：' + (e?.message || String(e));
       }
+      opts?.onToolResult?.(tc.function.name, args, result);
       messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
     }
   }

@@ -55,6 +55,8 @@ interface UIState {
   showProposals: boolean;
   /** AI 调用日志窗口开关（进度窗口，Phase 1a 起） */
   showAILog: boolean;
+  /** 执行轨迹面板开关（Phase 1.5，语义层） */
+  showTrace: boolean;
   // —— 标签页 ——
   tabs: TabItem[];
   activeTabId: string | null;
@@ -68,6 +70,8 @@ interface UIState {
   toggleProposals: () => void;
   setProposals: (v: boolean) => void;
   setAILog: (v: boolean) => void;
+  toggleTrace: () => void;
+  setTrace: (v: boolean) => void;
   /** 打开（或激活已存在的）标签页；module 类会同步高亮工具栏 */
   openTab: (input: OpenTabInput) => void;
   /** 打开（或激活已存在的）开始页标签 */
@@ -93,6 +97,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   copilotOpen: true,
   showProposals: false,
   showAILog: false,
+  showTrace: false,
   tabs: [],
   activeTabId: null,
   splitTabId: null,
@@ -104,6 +109,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   toggleProposals: () => set((s) => ({ showProposals: !s.showProposals })),
   setProposals: (v) => set({ showProposals: v }),
   setAILog: (v) => set({ showAILog: v }),
+  toggleTrace: () => set((s) => ({ showTrace: !s.showTrace })),
+  setTrace: (v) => set({ showTrace: v }),
   openTab: ({ title, icon, kind, ref }) => {
     const s = get();
     const existing = s.tabs.find((t) => t.kind === kind && t.ref === ref);

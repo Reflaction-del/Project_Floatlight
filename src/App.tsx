@@ -21,6 +21,7 @@ import { OnboardingModal } from './features/onboarding/OnboardingModal';
 import { FirstRunModal } from './components/FirstRunModal';
 import { StartPage } from './components/StartPage';
 import { OutlineView } from './features/outline/OutlineView';
+import { TracePanel } from './features/agent/TracePanel';
 
 // 重型视图改为按需懒加载：首屏只加载外壳与轻量视图，物料生成器（含 qrcode /
 // canvas / svg 渲染链）、关系图（图布局）、一致性检查、分享、时间轴等仅在打开
@@ -314,6 +315,7 @@ export default function App() {
         {copilotOpen && <CopilotSidebar />}
         <ProposalCenter />
         <AILogPanel />
+        <TracePanel />
         <PromptModal />
         <OnboardingModal />
         {firstRun && <FirstRunModal />}

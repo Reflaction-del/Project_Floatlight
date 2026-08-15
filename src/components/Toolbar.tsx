@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useUIStore } from '../store/uiStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
-import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline } from './icons';
+import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace } from './icons';
 
 
 const TEMPLATES = [
@@ -25,6 +25,8 @@ export function Toolbar() {
   const toggleCopilot = useUIStore((s) => s.toggleCopilot);
   const showProposals = useUIStore((s) => s.showProposals);
   const toggleProposals = useUIStore((s) => s.toggleProposals);
+  const showTrace = useUIStore((s) => s.showTrace);
+  const toggleTrace = useUIStore((s) => s.toggleTrace);
   const pendingCount = useWorldStore((s) => (s.worldsData[s.current]?.proposals ?? []).filter((p) => p.status === 'pending').length);
   const worldview = useWorldviewStore();
   const [wmOpen, setWmOpen] = useState(false);
@@ -86,6 +88,13 @@ export function Toolbar() {
       >
         <IconProposals />
         {pendingCount > 0 && <span className="prop-badge">{pendingCount}</span>}
+      </button>
+      <button
+        className={'tool-btn' + (showTrace ? ' active' : '')}
+        title="执行轨迹（对话与工具调用记录，可分叉/回放）"
+        onClick={toggleTrace}
+      >
+        <IconTrace />
       </button>
       <div className="save-group">
         <button className={'tool-btn save-btn' + (savedFlash ? ' flash' : '')} onClick={onSave} title="保存当前世界（数据已自动保存）">{savedFlash ? '✓' : <IconSave />}</button>
