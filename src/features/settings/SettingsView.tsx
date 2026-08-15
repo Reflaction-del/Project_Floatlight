@@ -9,6 +9,7 @@ import { getStartPageEnabled, setStartPageEnabled } from './startPageSetting';
 import { storage } from '../../storage';
 import { AIUsagePanel } from './AIUsagePanel';
 import { BridgeSettingsSection } from '../bridge/BridgeSettingsSection';
+import { MarketSettingsSection } from '../market/MarketSettingsSection';
 import { worldToMarkdown } from '../../utils/markdown';
 import { testConnection, listModels, embedTexts } from '../../utils/ai';
 import { rebuildIndexDelta, clearIndex, getIndexStats } from '../../utils/embeddingIndex';
@@ -639,6 +640,8 @@ export function SettingsView() {
         </section>
 
         <BridgeSettingsSection />
+
+        <MarketSettingsSection />
 
         <section className="set-section">
           <h3>导出 / 导入</h3>

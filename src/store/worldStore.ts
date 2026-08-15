@@ -9,6 +9,7 @@ import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../featur
 import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
 import type { BridgeEntry } from '../features/bridge/types';
 import type { Rulebook, TTRPGSession, SessionTurn } from '../features/ttrpg/types';
+import type { WorldTemplateFile } from '../features/market/worldTemplate';
 import { newSimulation, pushEvent } from '../features/simulation/simOps';
 import type {
   DocFile,
@@ -176,6 +177,8 @@ interface WorldState {
   updateTemplate: (id: string, patch: Partial<MaterialTemplate>) => void;
   deleteTemplate: (id: string) => void;
   addWorld: (name: string, template?: 'empty' | 'novel' | 'script') => void;
+  /** 插件市场：从 .fuguworld 世界模板创建新世界（返回 worldKey，失败返回 null） */
+  addWorldFromTemplate: (template: WorldTemplateFile, preferName?: string) => string | null;
   removeWorld: (name: string, nextName?: string) => void;
   renameWorld: (oldName: string, newName: string) => void;
   switchWorld: (name: string, onPrompt?: (current: string) => Promise<'save' | 'discard' | 'cancel'>) => Promise<boolean>;
@@ -1354,6 +1357,29 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       const tmpl = TEMPLATES[template] || TEMPLATES.empty;
       const wd = tmpl();
       set((s) => { const next = { ...s, worldsData: { ...s.worldsData, [name]: wd }, dirty: true }; saveAllData(next.worldsData); return next; });
+    },
+    addWorldFromTemplate: (template, preferName) => {
+      const base = TEMPLATES.empty();
+      const picked: any = {};
+      const keys = ['entities', 'relations', 'timelines', 'outline', 'docs', 'folders', 'styles', 'templates', 'materials', 'rulebooks'] as const;
+      for (const k of keys) {
+        const v = (template.world as any)?.[k];
+        if (Array.isArray(v)) picked[k] = v;
+      }
+      const wd = { ...base, ...picked };
+      // worldKey：模板名或优先名，冲突加后缀
+      const raw = (preferName || template.name || '新世界').trim();
+      let key = raw;
+      const st = get();
+      let i = 2;
+      while (st.worldsData[key]) key = `${raw} ${i++}`;
+      set((s) => {
+        const next = { ...s, worldsData: { ...s.worldsData, [key]: wd }, current: key, dirty: true };
+        saveAllData(next.worldsData);
+        storage.saveCurrent(key);
+        return next;
+      });
+      return key;
     },
     removeWorld: (name, nextName) => {
       set((s) => {

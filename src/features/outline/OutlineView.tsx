@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { useWorldStore } from '../../store/worldStore';
 import { useUIStore } from '../../store/uiStore';
 import { treeify, type OutlineTreeNode } from './outlineOps';
+import { scanForeshadow } from './foreshadowLedger';
 import {
   OUTLINE_KIND_LABEL,
   OUTLINE_STATUS_LABEL,
@@ -33,6 +34,7 @@ function OutlineNodeItem({ node, depth }: { node: OutlineTreeNode; depth: number
   const move = useWorldStore((s) => s.moveOutlineNode);
   const add = useWorldStore((s) => s.addOutlineNode);
   const openTab = useUIStore((s) => s.openTab);
+  const [showLedger, setShowLedger] = useState(false);
   const docs = useWorldStore((s) => (s.worldsData[s.current]?.docs ?? []));
 
   const [editing, setEditing] = useState(false);
@@ -56,6 +58,14 @@ function OutlineNodeItem({ node, depth }: { node: OutlineTreeNode; depth: number
 
   const onDelete = () => {
     if (window.confirm(`删除「${node.title}」及其全部子节点？`)) del(node.id);
+  };
+
+  const cycleForeshadow = () => {
+    const f = node.foreshadow;
+    if (!f) update(node.id, { foreshadow: { setup: true, payoff: false } });
+    else if (f.setup && !f.payoff) update(node.id, { foreshadow: { setup: true, payoff: true } });
+    else if (f.setup && f.payoff) update(node.id, { foreshadow: undefined as any });
+    else update(node.id, { foreshadow: { setup: true, payoff: false } });
   };
 
   return (
@@ -84,6 +94,13 @@ function OutlineNodeItem({ node, depth }: { node: OutlineTreeNode; depth: number
         <span className="ol-ops">
           <button className="ol-btn" title="新增子节点" onClick={() => add({ title: '新' + OUTLINE_KIND_LABEL[childKind(node.kind)], kind: childKind(node.kind), parentId: node.id })}>+</button>
           <button className="ol-btn" title="编辑标题" onClick={() => { setTitle(node.title); setEditing(true); }}>✎</button>
+          <button
+            className={'ol-btn fs-' + (node.foreshadow ? (node.foreshadow.setup && node.foreshadow.payoff ? 'paid' : 'open') : 'none')}
+            title={node.foreshadow ? (node.foreshadow.setup && node.foreshadow.payoff ? '已回收伏笔（点击取消标记）' : '已埋设伏笔（点击标记回收）') : '伏笔标记：点击埋设'}
+            onClick={cycleForeshadow}
+          >
+            {!node.foreshadow ? '🔘' : node.foreshadow.setup && node.foreshadow.payoff ? '✅' : '🔒'}
+          </button>
           <button className="ol-btn" title="上移" disabled={isFirst} onClick={moveUp}>↑</button>
           <button className="ol-btn" title="下移" onClick={moveDown}>↓</button>
           <button className="ol-btn danger" title="删除（含子节点）" onClick={onDelete}>×</button>
@@ -121,8 +138,10 @@ export function OutlineView() {
   const add = useWorldStore((s) => s.addOutlineNode);
   const update = useWorldStore((s) => s.updateOutlineNode);
   const openTab = useUIStore((s) => s.openTab);
+  const [showLedger, setShowLedger] = useState(false);
 
   const tree = useMemo(() => treeify(outline), [outline]);
+  const ledger = useMemo(() => scanForeshadow(outline), [outline]);
 
   return (
     <div className="outline-view">
@@ -132,7 +151,47 @@ export function OutlineView() {
         <button className="mode-btn active" onClick={() => add({ title: '新卷', kind: 'volume', parentId: null })}>
           + 新建顶层节点
         </button>
+        <button className="mode-btn" onClick={() => setShowLedger((v) => !v)} title="伏笔账本：已埋设未回收的伏笔">
+          伏笔{ledger.counts.open > 0 ? `（${ledger.counts.open}）` : ''}
+        </button>
       </div>
+
+      {showLedger && (
+        <div className="ol-ledger">
+          {ledger.counts.open === 0 && ledger.counts.orphan === 0 ? (
+            <div className="tip">账本干净：大纲中没有未回收的伏笔。</div>
+          ) : (
+            <>
+              {ledger.counts.open > 0 && (
+                <>
+                  <div className="ol-ledger-title">🔒 未回收伏笔（{ledger.counts.open}）</div>
+                  {ledger.open.map((n) => (
+                    <div key={n.id} className="ol-ledger-item">
+                      <span className="ol-ledger-node">{n.title}</span>
+                      <span className="tip">{OUTLINE_STATUS_LABEL[n.status]}</span>
+                      {n.entityIds && n.entityIds.length > 0 && <span className="tip">关联实体 {n.entityIds.length}</span>}
+                      <button className="ol-btn" onClick={() => update(n.id, { foreshadow: { setup: true, payoff: true } })} title="标记已回收">✅ 回收</button>
+                    </div>
+                  ))}
+                </>
+              )}
+              {ledger.counts.orphan > 0 && (
+                <>
+                  <div className="ol-ledger-title warn">⚠️ 孤儿回收标记（{ledger.counts.orphan}）</div>
+                  {ledger.orphan.map((n) => (
+                    <div key={n.id} className="ol-ledger-item">
+                      <span className="ol-ledger-node">{n.title}</span>
+                      <span className="tip">标记了回收但未埋设</span>
+                      <button className="ol-btn" onClick={() => update(n.id, { foreshadow: { setup: true, payoff: true } })} title="补为已埋设已回收">✅ 补埋设</button>
+                      <button className="ol-btn" onClick={() => update(n.id, { foreshadow: undefined as any })} title="清除标记">清除</button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
       <div className="outline-tree">
         {tree.length === 0 ? (
           <div className="outline-empty">
