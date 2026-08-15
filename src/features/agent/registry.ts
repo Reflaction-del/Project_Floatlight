@@ -144,7 +144,7 @@ export function buildToolContext(ctx: ToolBuildContext): ToolContext {
 
   const defs = [...dynamicTools(ctx), ...registry.values()];
   const tools: ToolDef[] = [
-    ...base.tools,
+    ...(enabledSet ? base.tools.filter((t) => enabledSet.has(t.name)) : base.tools),
     ...defs.filter((d) => !enabledSet || enabledSet.has(d.name)).map((d) => ({
       name: d.name,
       description: d.description,

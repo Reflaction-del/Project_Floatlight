@@ -27,6 +27,7 @@ import {
 } from '../utils/worldContext';
 import type { WikiEntity, WikiRelation } from '../types';
 import type { WorldData } from '../store/worldStore';
+import { runAgentLoop } from '../features/agent/loop';
 
 marked.setOptions({
   gfm: true,
@@ -231,6 +232,9 @@ export function CopilotSidebar() {
   const [usedRefs, setUsedRefs] = useState<Retrieved[]>([]);
   const [cited, setCited] = useState<string[]>([]);
   const [showThinking, setShowThinking] = useState<Set<number>>(new Set());
+  // —— 协作者模式（Phase 2）：工具化多步执行 + 执行步骤展示 ——
+  const [agentMode, setAgentMode] = useState(false);
+  const [steps, setSteps] = useState<{ kind: 'tool_call' | 'tool_result' | 'reasoning' | 'context'; summary: string; detail?: string }[]>([]);
 
   // —— 引用上下文（手动指定文章/实体作为固定背景）——
   const [pinned, setPinned] = useState<{ kind: 'doc' | 'entity'; id: string }[]>([]);
@@ -448,6 +452,52 @@ export function CopilotSidebar() {
     setLoading(true);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+
+    // —— 协作者模式（Phase 2）：走 Agent Loop，模型可连续调用工具后给出最终回答 ——
+    if (agentMode) {
+      if (!world) {
+        setLoading(false);
+        setMsgs((p) => [...p, { role: 'assistant' as const, content: '（当前世界数据为空，无法启动协作者模式）' }]);
+        persistChat();
+        return;
+      }
+      setSteps([]);
+      let full = '';
+      try {
+        const res = await runAgentLoop({
+          model: currentModel,
+          world,
+          history: apiMsgs.filter((m) => m.role !== 'system'),
+          userMessage: q || '（图片消息）',
+          sessionId: 'copilot-main',
+          snapshotBudget: 800,
+          signal: abortRef.current.signal,
+          onToolCall: (name, args) => {
+            setSteps((prev) => [...prev, { kind: 'tool_call', summary: `调用工具 ${name}`, detail: JSON.stringify(args, null, 2) }]);
+          },
+          onToolResult: (name, result) => {
+            setSteps((prev) => [...prev, { kind: 'tool_result', summary: `${name} 返回 ${result.length} 字符`, detail: result.slice(0, 800) }]);
+          },
+        });
+        full = res.text;
+        setMsgs((prev) => {
+          const next = [...prev.slice(0, -1), { role: 'assistant' as const, content: full }];
+          msgsRef.current = next;
+          return next;
+        });
+      } catch (e: any) {
+        full = '';
+        if (String(e?.message ?? e).includes('aborted')) return;
+        setMsgs((p) => [...p, { role: 'assistant' as const, content: `（${e?.message ?? e}）` }]);
+      } finally {
+        setLoading(false);
+        abortRef.current = null;
+        setSteps([]);
+        persistChat();
+      }
+      return;
+    }
+
     let full = '';
     await chatStream(
       currentModel,
@@ -561,6 +611,13 @@ export function CopilotSidebar() {
         >
           约束模式
         </button>
+        <button
+          className={'co-task co-agent' + (agentMode ? ' active' : '')}
+          onClick={() => setAgentMode((v) => !v)}
+          title="协作者模式：AI 可调用工具（查大纲/扫一致性/取世界快照/检索实体）连续完成多步任务，执行过程会记录到「轨迹」"
+        >
+          协作者
+        </button>
         {taskBtn('prose', '续写')}
         {taskBtn('idea', '灵感')}
         {taskBtn('lore', '考据')}
@@ -670,8 +727,20 @@ export function CopilotSidebar() {
         ))}
         {loading && (
           <div className="co-status-row">
-            <span className="tip">AI 响应中…</span>
+            <span className="tip">{agentMode ? '协作者执行中…' : 'AI 响应中…'}</span>
             <button className="co-stop-btn" onClick={stop} title="终止当前响应">停止</button>
+          </div>
+        )}
+        {/* 协作者模式：实时展示工具执行步骤（与「轨迹」面板同源采集） */}
+        {loading && agentMode && steps.length > 0 && (
+          <div className="co-steps">
+            <div className="co-row-label">执行步骤：</div>
+            {steps.map((s, i) => (
+              <div key={i} className={'co-step cs-' + s.kind}>
+                <span className="co-step-sum">{s.summary}</span>
+                {s.detail && <pre className="co-step-detail">{s.detail}</pre>}
+              </div>
+            ))}
           </div>
         )}
         {cited.length > 0 && (

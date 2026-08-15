@@ -3714,6 +3714,15 @@ button:active,
 .trace-step.st-subagent { border-color: #7f77dd; }
 .trace-step.st-narrate { border-color: #378add; }
 
+/* ============ 协作者模式（Phase 2，AI 侧栏） ============ */
+.co-task.co-agent.active { background: var(--accent, #0f6cbd); color: #fff; }
+.co-steps { margin: 8px 0; padding: 8px 10px; background: var(--bg-soft, #f5f7fa); border-radius: 8px; }
+.co-step { display: flex; flex-direction: column; padding: 4px 0; border-left: 3px solid var(--border); padding-left: 8px; margin: 4px 0; }
+.co-step.cs-tool_call { border-color: #d85a30; }
+.co-step.cs-tool_result { border-color: #1d9e75; }
+.co-step-sum { font-size: 12px; font-weight: 600; }
+.co-step-detail { margin: 4px 0 0; padding: 6px 8px; background: rgba(0,0,0,.04); border-radius: 6px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 140px; overflow-y: auto; }
+
 /* ============ AI 调用日志窗口（进度窗口） ============ */
 .ai-log-modal {
   width: min(760px, 94vw);
