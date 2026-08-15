@@ -64,6 +64,18 @@ const api = {
   bridgeGetStatus: () => ipcRenderer.invoke('bridge:get-status'),
   bridgeSetEnabled: (v) => ipcRenderer.invoke('bridge:set-enabled', v),
   bridgeRotateToken: () => ipcRenderer.invoke('bridge:rotate-token'),
+
+  // —— LAN 跑团（Phase 4b）：房主 WS 服务 ——
+  lanHostStart: (opts) => ipcRenderer.invoke('lan:host-start', opts),
+  lanHostStop: () => ipcRenderer.invoke('lan:host-stop'),
+  lanHostSend: (opts) => ipcRenderer.invoke('lan:host-send', opts),
+  lanHostBroadcast: (opts) => ipcRenderer.invoke('lan:host-broadcast', opts),
+  lanGetStatus: () => ipcRenderer.invoke('lan:get-status'),
+  onLanEvent: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('lan:event', handler);
+    return () => ipcRenderer.removeListener('lan:event', handler);
+  },
 };
 contextBridge.exposeInMainWorld('api', api);
 try {

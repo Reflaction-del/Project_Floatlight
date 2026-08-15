@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, session } = require('electron');
 
 const DIST = path.join(app.getAppPath(), 'dist');
@@ -125,6 +126,85 @@ function bridgeRateLimited() {
   bridgeHits.push(now);
   return false;
 }
+// ============================================================
+// LAN 跑团 WS 服务（Phase 4b）
+// ------------------------------------------------------------
+// 房主实例启动的局域网 WebSocket 服务（绑定 0.0.0.0，仅局域网可达）：
+// - 握手校验 ?room=房间码&token=令牌，防陌生连接
+// - 主进程只做帧传输与转发（薄层）：消息路由/业务在房主渲染进程
+// - 连接事件经 lan:event 转发渲染进程；渲染进程经 lan:host-send/broadcast 下发
+// - 远程玩家安装应用后输 地址+房间码+令牌 加入，无需账号
+// - 服务实现抽离到 lan-server.cjs（无 Electron 依赖，vitest 集成测试覆盖）
+// ============================================================
+const lanServerMod = require('./src/features/ttrpg/lan/lan-server.cjs');
+let lanHost = null; // createLanServer 返回的句柄
+
+function makeLanRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去易混淆 I/O/0/1
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function getLanIPs() {
+  const out = [];
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const it of (ifaces[name] || [])) {
+      if (it.family === 'IPv4' && !it.internal) out.push(it.address);
+    }
+  }
+  return out;
+}
+
+function lanNotify(win, event, data) {
+  if (win && !win.isDestroyed()) win.webContents.send('lan:event', Object.assign({ event }, data));
+}
+
+function stopLanHost() {
+  if (lanHost) {
+    try { lanHost.stop(); } catch { /* ignore */ }
+    lanHost = null;
+  }
+}
+
+function startLanHost(win, roomCode, token) {
+  stopLanHost();
+  lanHost = lanServerMod.createLanServer({
+    roomCode,
+    token,
+    onEvent: (ev) => lanNotify(win, ev.event, ev),
+  });
+  return lanHost;
+}
+
+// —— LAN IPC ——
+ipcMain.handle('lan:host-start', async (_e, opts) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  const roomCode = (opts && opts.roomCode) || makeLanRoomCode();
+  const token = (opts && opts.token) || crypto.randomBytes(12).toString('hex');
+  const host = startLanHost(win, roomCode, token);
+  await host.ready();
+  return { ok: true, port: host.port(), roomCode, token, ips: getLanIPs() };
+});
+ipcMain.handle('lan:host-stop', () => { stopLanHost(); return { ok: true }; });
+ipcMain.handle('lan:host-send', (_e, opts) => {
+  if (!lanHost || !opts || typeof opts.name !== 'string') return { ok: false, error: 'no room' };
+  return lanHost.sendTo(opts.name, opts.payload) ? { ok: true } : { ok: false, error: 'peer not found' };
+});
+ipcMain.handle('lan:host-broadcast', (_e, opts) => {
+  if (!lanHost) return { ok: false, error: 'no room' };
+  const count = lanHost.broadcast(opts && opts.payload, opts && opts.except);
+  return { ok: true, count };
+});
+ipcMain.handle('lan:get-status', () => ({
+  ok: true,
+  hosting: !!lanHost,
+  port: lanHost ? lanHost.port() : 0,
+  roomCode: '',
+  clients: lanHost ? lanHost.clientNames() : [],
+}));
+
 function startBridgeServer() {
   const server = http.createServer((req, res) => {
     const sendJson = (code, obj) => {
