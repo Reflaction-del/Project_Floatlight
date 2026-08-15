@@ -3,6 +3,15 @@
 本文件为在本仓库工作的 AI 助手提供项目背景、架构约定与工程红线。
 人工维护，请在本文件顶部追加变更，不要删除历史上下文。
 
+## 0. 自动化测试与提交门禁（2026-08-15 新增）
+
+- **测试框架**：vitest 4（`vitest.config.ts`，node 环境）。用例与源码同目录：`src/**/*.test.ts`。
+- **命令**：`npm test`（跑一次）/ `npm test:watch` / `npm run check`（test + build 全量门禁）。
+- **提交门禁**：husky 9 pre-commit（`.husky/pre-commit`）自动执行 `npm test`，**测试失败阻止 commit**。每次开发完成、提交前必须保证测试通过。
+- **双份解析实现红线**：`utils/ai.ts` 与 `utils/aiStreamWorker.ts` 的 `extractContent`/`parseMessageFromBody` 逻辑必须保持一致，改任一侧须两侧同改；`ai.test.ts` 守护 ai.ts 一侧，用例须保持通过。
+- **reasoning 兜底约定**：content 为空串 `''` 时必须回退 `reasoning_content`/`reasoning`（`??` 对空串不生效，须用「取第一个非空串」），测试覆盖此回归场景。
+- 新增依赖：`vitest` / `husky` / `lint-staged`（devDependencies）。
+
 ## 1. 产品定位
 
 - **是什么**：面向小说作者、游戏策划、TRPG 主持人的**世界观管理工具**。把零散灵感整合为可用产出物（实体卡、关系图、时间线、视觉物料）。

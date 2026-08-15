@@ -11,7 +11,8 @@ import { useUIStore } from '../store/uiStore';
 import { IconProposals } from './icons';
 import { PROPOSAL_SOURCE_LABEL, type Proposal, type ProposalSource } from '../store/proposalTypes';
 
-const SOURCE_ORDER: ProposalSource[] = ['article', 'material', 'linker', 'template-gen', 'chat', 'manual'];
+// agent（主动提议）置顶展示：agent 感知世界变化后主动生成的建议，优先让用户看到
+const SOURCE_ORDER: ProposalSource[] = ['agent', 'article', 'material', 'linker', 'scene', 'template-gen', 'chat', 'manual'];
 
 function opDetail(p: Proposal): string {
   switch (p.op.kind) {
@@ -20,7 +21,7 @@ function opDetail(p: Proposal): string {
     case 'addRelation':
       return `新增关系：${p.op.source} → ${p.op.target}（${p.op.type}）`;
     case 'updateEntity':
-      return `修改实体 ${p.op.entityId} 字段`;
+      return p.source === 'agent' ? '补全已有实体缺失的字段 / 标签 / 笔记，不覆盖现有数据' : `修改实体 ${p.op.entityId} 字段`;
     case 'addTemplate':
       return `新增模板：${p.op.template.name}`;
   }
@@ -64,7 +65,7 @@ export function ProposalCenter() {
         {proposals.length === 0 ? (
           <div className="prop-empty">
             <div>暂无提案。</div>
-            <div className="tip">AI 生成的实体、关系、字段或模板会先进入这里，由你逐条确认后再写入世界观。</div>
+            <div className="tip">AI 生成的实体、关系、字段或模板会先进入这里，由你逐条确认后再写入世界观。导入文章时若检测到与已有实体重复的内容，Agent 也会主动提议补全。</div>
           </div>
         ) : (
           <div className="prop-list">
@@ -75,8 +76,9 @@ export function ProposalCenter() {
                   <span className="prop-group-count">{items.length}</span>
                 </div>
                 {items.map((p) => (
-                  <div className={'prop-item ' + p.status} key={p.id}>
+                  <div className={'prop-item ' + p.status + (p.source === 'agent' ? ' agent' : '')} key={p.id}>
                     <div className="prop-item-main">
+                      {p.source === 'agent' && <span className="prop-agent-tag">Agent 自动检测</span>}
                       <div className="prop-item-summary">{p.summary}</div>
                       <div className="prop-item-detail">{opDetail(p)}</div>
                     </div>

@@ -12,6 +12,7 @@ import type { AIMessage } from '../utils/ai';
 
 /** 提案来源（用于提案中心分组与标识） */
 export type ProposalSource =
+  | 'agent' // Agent 主动提议（世界变化感知，规则驱动，如导入时检测重复实体）
   | 'article' // 功能1：文章抽取实体/关系
   | 'material' // 物料字段 AI 补全
   | 'linker' // 功能3：实体名称关联
@@ -55,6 +56,8 @@ export interface Proposal {
   source: ProposalSource;
   /** 来源可读标签（覆盖默认映射时用） */
   sourceLabel?: string;
+  /** 主动提议去重键：同一世界内相同 key 的提案不重复生成（含已处理，拒绝过的也不再打扰） */
+  dedupKey?: string;
   createdAt: number;
   op: ProposalOp;
   status: ProposalStatus;
@@ -73,6 +76,7 @@ export interface ChatSession {
 }
 
 export const PROPOSAL_SOURCE_LABEL: Record<ProposalSource, string> = {
+  agent: '主动提议',
   article: '文章抽取',
   material: '物料字段',
   linker: '实体关联',

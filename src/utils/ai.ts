@@ -436,8 +436,9 @@ async function readAllText(resp: Response): Promise<string> {
 }
 
 /** 从响应体文本中提取 content 与 usage；兼容 SSE 流与单条 JSON 两种格式。
- * 部分本地服务会忽略 stream:false 而回吐 SSE，resp.json() 无法解析 → 这里统一兜底。 */
-function extractContent(text: string): { content: string; usage: any } {
+ * 部分本地服务会忽略 stream:false 而回吐 SSE，resp.json() 无法解析 → 这里统一兜底。
+ * 导出仅为单元测试；与 aiStreamWorker.ts 内的同名副本逻辑必须保持一致。 */
+export function extractContent(text: string): { content: string; usage: any } {
   const t = (text || '').trim();
   const lines = t.split('\n');
   let isSSE = false;
@@ -455,8 +456,12 @@ function extractContent(text: string): { content: string; usage: any } {
       try {
         const j = JSON.parse(d);
         const delta = j?.choices?.[0]?.delta ?? {};
-        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接
-        content += delta?.content ?? delta?.reasoning_content ?? delta?.reasoning ?? j?.choices?.[0]?.text ?? '';
+        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接。
+        // 注意用「第一个非空串」而非 ??：content 常为 '' 空串，?? 对空串不生效会丢正文
+        const deltaText =
+          [delta?.content, delta?.reasoning_content, delta?.reasoning, j?.choices?.[0]?.text]
+            .find((v) => typeof v === 'string' && v.length > 0) ?? '';
+        content += deltaText;
         if (j?.usage) usage = j.usage;
       } catch { /* 忽略不完整/非法行 */ }
     }
@@ -465,7 +470,11 @@ function extractContent(text: string): { content: string; usage: any } {
   try {
     const j = JSON.parse(t);
     const msg = j?.choices?.[0]?.message ?? {};
-    return { content: msg?.content ?? msg?.reasoning_content ?? msg?.reasoning ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
+    // content 常为 '' 空串，?? 对空串不生效 → 取第一个非空串（reasoning 兜底）
+    const content =
+      [msg?.content, msg?.reasoning_content, msg?.reasoning, j?.choices?.[0]?.text]
+        .find((v) => typeof v === 'string' && v.length > 0) ?? '';
+    return { content, usage: j?.usage ?? null };
   } catch {
     return { content: t, usage: null };
   }
@@ -719,8 +728,9 @@ interface RawMessage {
 }
 
 /** 从响应体（可能是 SSE 流或单条 JSON）抽取 assistant message（含 tool_calls）。
- * 本地服务常无视 stream:false 而推 SSE，此处统一兜底：SSE 下按 index 累加 tool_calls 增量。 */
-function parseMessageFromBody(text: string): RawMessage {
+ * 本地服务常无视 stream:false 而推 SSE，此处统一兜底：SSE 下按 index 累加 tool_calls 增量。
+ * 导出仅为单元测试；与 aiStreamWorker.ts 内的同名副本逻辑必须保持一致。 */
+export function parseMessageFromBody(text: string): RawMessage {
   const t = (text || '').trim();
   const lines = t.split('\n');
   let isSSE = false;
@@ -738,9 +748,9 @@ function parseMessageFromBody(text: string): RawMessage {
       try {
         const j = JSON.parse(d);
         const delta = j?.choices?.[0]?.delta ?? {};
-        if (typeof delta.content === 'string') content += delta.content;
-        // 推理模型兜底：正文在 reasoning_content
-        else if (typeof delta.reasoning_content === 'string') content += delta.reasoning_content;
+        if (typeof delta.content === 'string' && delta.content.length > 0) content += delta.content;
+        // 推理模型兜底：正文在 reasoning_content（空串不算有效 content，避免丢失推理正文）
+        else if (typeof delta.reasoning_content === 'string' && delta.reasoning_content.length > 0) content += delta.reasoning_content;
         const tcs = delta.tool_calls;
         if (Array.isArray(tcs)) {
           for (const tc of tcs) {
@@ -760,14 +770,17 @@ function parseMessageFromBody(text: string): RawMessage {
   try {
     const j = JSON.parse(t);
     const msg = j?.choices?.[0]?.message ?? {};
-    return { role: msg.role || 'assistant', content: msg.content ?? msg.reasoning_content ?? null, tool_calls: msg.tool_calls };
+    // content 空串时回退 reasoning_content（?? 对空串不生效，需取第一个非空串）
+    const content =
+      [msg.content, msg.reasoning_content].find((v) => typeof v === 'string' && v.length > 0) ?? null;
+    return { role: msg.role || 'assistant', content, tool_calls: msg.tool_calls };
   } catch {
     return { role: 'assistant', content: t, tool_calls: undefined };
   }
 }
 
-/** 宽松解析工具参数（容忍被截断的不完整 JSON） */
-function safeParseArgs(s: string): Record<string, unknown> {
+/** 宽松解析工具参数（容忍被截断的不完整 JSON）。导出仅为单元测试。 */
+export function safeParseArgs(s: string): Record<string, unknown> {
   const str = (s || '').trim();
   if (!str) return {};
   try {
