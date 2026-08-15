@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useUIStore } from '../store/uiStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
-import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals } from './icons';
+import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline } from './icons';
 
 
 const TEMPLATES = [
@@ -59,6 +59,7 @@ export function Toolbar() {
         <IconGlobe />
       </button>
       <button className={'tool-btn' + (activeModule === 'entities' ? ' mod-active' : '')} title="实体库" onClick={() => openTab({ title: '实体库', icon: 'entities', kind: 'module', ref: 'entities' })}><IconEntities /></button>
+      <button className="tool-btn" title="全局大纲（章节结构，Agent 可读写）" onClick={() => openTab({ title: '全局大纲', icon: 'outline', kind: 'outline', ref: 'outline' })}><IconOutline /></button>
       <button className={'tool-btn' + (activeModule === 'relations' ? ' mod-active' : '')} title="线索板" onClick={() => openTab({ title: '线索板', icon: 'relations', kind: 'module', ref: 'relations' })}><IconRelations /></button>
       <button className={'tool-btn' + (activeModule === 'consistency' ? ' mod-active' : '')} title="一致性检查" onClick={() => openTab({ title: '一致性检查', icon: 'consistency', kind: 'module', ref: 'consistency' })}><IconConsistency /></button>
       <button className={'tool-btn' + (activeModule === 'share' ? ' mod-active' : '')} title="协作与分享" onClick={() => openTab({ title: '协作与分享', icon: 'share', kind: 'module', ref: 'share' })}><IconShare /></button>

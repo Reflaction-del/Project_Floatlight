@@ -205,6 +205,19 @@ export function IconProposals(p: IconProps) {
   );
 }
 
+/* 全局大纲 — 树形层级（Phase 1） */
+export function IconOutline(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 5h16" />
+      <path d="M4 12h10" />
+      <path d="M4 19h6" />
+      <circle cx="19" cy="12" r="1.6" />
+      <circle cx="15" cy="19" r="1.6" />
+    </Svg>
+  );
+}
+
 /* ===== 编辑器右键菜单专用图标 ===== */
 
 /* 从选区新建实体 — 方框加号 */

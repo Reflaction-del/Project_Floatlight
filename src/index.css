@@ -3613,9 +3613,60 @@ button:active,
 /* 工具栏提案中心按钮角标 */
 .prop-badge {
   position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px;
-  border-radius: 999px; background: var(--danger, #e5484d); color: #fff;
-  font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
+  border-radius: 999px; background: var(--danger, #e5484d); color: #fff;  font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
 }
+
+/* ============ 全局大纲视图（Phase 1） ============ */
+.outline-view {
+  display: flex; flex-direction: column; height: 100%; padding: 16px 20px; overflow: hidden;
+}
+.outline-head {
+  display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+}
+.outline-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.outline-head .tip { flex: 1; font-size: 12px; color: var(--fg-muted); }
+.outline-tree { flex: 1; overflow-y: auto; padding: 12px 4px 24px; }
+.outline-empty {
+  padding: 40px 20px; text-align: center; color: var(--fg-muted);
+}
+.outline-empty p { margin: 0 0 8px; font-size: 13.5px; }
+.ol-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+}
+.ol-row:hover { background: var(--bg-soft, #f5f7fa); }
+.ol-row.done { opacity: .55; }
+.ol-kind {
+  flex-shrink: 0; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+  background: var(--bg-soft, #eef1f6); color: var(--fg-muted);
+}
+.ol-title { flex: 1; min-width: 0; font-size: 13.5px; cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-title-input { flex: 1; min-width: 0; font-size: 13.5px; padding: 2px 6px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: inherit; }
+.ol-status {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; cursor: pointer;
+}
+.ol-status.st-todo { background: var(--bg-soft, #eef1f6); color: var(--fg-muted); }
+.ol-status.st-drafting { background: #e6f1fb; color: #185fa5; }
+.ol-status.st-done { background: #eaf3de; color: #3b6d11; }
+.ol-status.st-paused { background: #faeeda; color: #854f0b; }
+.ol-ops { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity .12s; }
+.ol-row:hover .ol-ops { opacity: 1; }
+.ol-btn {
+  width: 22px; height: 22px; padding: 0; border: none; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--fg-muted); font-size: 13px; line-height: 1;
+}
+.ol-btn:hover:not(:disabled) { background: var(--bg-soft, #e5e9f0); color: inherit; }
+.ol-btn:disabled { opacity: .3; cursor: default; }
+.ol-btn.danger:hover { background: #fcebeb; color: #a32d2d; }
+.ol-links { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.ol-link {
+  width: 20px; height: 20px; padding: 0; border: none; border-radius: 6px; cursor: pointer;
+  background: var(--bg-soft, #eef1f6); color: var(--fg-muted); font-size: 11px;
+}
+.ol-link:hover { color: var(--accent); }
+.ol-summary { font-size: 11.5px; color: var(--fg-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-children { margin-left: 14px; border-left: 1px dashed var(--border); }
+.ol-assoc { display: flex; align-items: center; gap: 8px; padding: 8px 0 4px; border-top: 1px solid var(--border); }
+.ol-select { font-size: 12px; padding: 3px 8px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: inherit; max-width: 260px; }
 
 /* ============ AI 调用日志窗口（进度窗口） ============ */
 .ai-log-modal {

@@ -4,6 +4,8 @@ import { createDefaultStyleToken } from '../features/materials/types';
 import type { MaterialStyle, GeneratedMaterial, MaterialTemplate } from '../features/materials/types';
 import { GUIDE_DOCS } from '../seed/guide';
 import type { Proposal, ChatSession } from './proposalTypes';
+import type { OutlineNode } from '../features/outline/types';
+import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
 import type {
   DocFile,
   WikiElement,
@@ -65,6 +67,8 @@ export interface WorldData {
   proposals: Proposal[];
   /** AI 对话记录（Phase 0）：每世界一份持久化会话 */
   chats: ChatSession[];
+  /** 全局大纲（Phase 1）：树形结构，parentId 递归任意深度 */
+  outline: OutlineNode[];
   /** 演示种子版本号（仅演示世界带此字段）；< CURRENT_SEED_VERSION 时启动时强制升级到最新演示 */
   seedVersion?: number;
 }
@@ -154,6 +158,20 @@ interface WorldState {
   /* ——— AI 对话持久化（Phase 0） ——— */
   upsertChat: (worldKey: string, chat: ChatSession) => void;
   getChat: (worldKey: string, id: string) => ChatSession | undefined;
+  /* ——— 全局大纲（Phase 1） ——— */
+  addOutlineNode: (input: {
+    title: string;
+    kind: OutlineNode['kind'];
+    parentId?: string | null;
+    summary?: string;
+    docId?: string;
+    timelineId?: string;
+    status?: OutlineNode['status'];
+  }) => string;
+  updateOutlineNode: (id: string, patch: Partial<OutlineNode>) => void;
+  deleteOutlineNode: (id: string) => void;
+  /** 移动节点到新父级/位置；非法（成环）返回 false */
+  moveOutlineNode: (id: string, newParentId: string | null, newOrder: number) => boolean;
   deleteChat: (worldKey: string, id: string) => void;
 }
 
@@ -174,6 +192,7 @@ function emptyTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
   };
 }
 function novelTemplate(): WorldData {
@@ -202,6 +221,7 @@ function novelTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
   };
 }
 function scriptTemplate(): WorldData {
@@ -223,6 +243,7 @@ function scriptTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
   };
 }
 
@@ -914,6 +935,7 @@ export const DEFAULT_DATA: WorldData = {
   ],
   proposals: [DEMO_PROPOSAL],
   chats: [],
+  outline: [],
 };
 
 let docSeq = 100;
@@ -1362,6 +1384,60 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
         const next = { ...s, worldsData: { ...s.worldsData, [worldKey]: { ...wd, chats } }, dirty: true };
         saveAllData(next.worldsData); return next;
       });
+    },
+    /* ——— 全局大纲（Phase 1） ——— */
+    addOutlineNode: (input) => {
+      const now = Date.now();
+      const id = `ol-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = wd.outline ?? [];
+        const parentId = input.parentId ?? null;
+        const node: OutlineNode = {
+          id,
+          title: input.title || '未命名节点',
+          kind: input.kind,
+          parentId,
+          order: nextOrder(outline, parentId),
+          status: input.status ?? 'todo',
+          summary: input.summary,
+          docId: input.docId,
+          timelineId: input.timelineId,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline: [...outline, node] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateOutlineNode: (id, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = (wd.outline ?? []).map((n) => (n.id === id ? { ...n, ...patch, id, updatedAt: Date.now() } : n));
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    deleteOutlineNode: (id) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = removeSubtree(wd.outline ?? [], id);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    moveOutlineNode: (id, newParentId, newOrder) => {
+      const s = get();
+      const wd = s.worldsData[s.current]; if (!wd) return false;
+      const moved = moveOutlineNode(wd.outline ?? [], id, newParentId, newOrder);
+      if (!moved) return false;
+      set((st) => {
+        const w = st.worldsData[st.current]; if (!w) return st;
+        const next = { ...st, worldsData: { ...st.worldsData, [st.current]: { ...w, outline: moved } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return true;
     },
   } as WorldState;
 });
