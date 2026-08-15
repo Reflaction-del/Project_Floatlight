@@ -12,7 +12,7 @@ import { IconProposals } from './icons';
 import { PROPOSAL_SOURCE_LABEL, type Proposal, type ProposalSource } from '../store/proposalTypes';
 
 // agent（主动提议）置顶展示：agent 感知世界变化后主动生成的建议，优先让用户看到
-const SOURCE_ORDER: ProposalSource[] = ['agent', 'article', 'material', 'linker', 'scene', 'template-gen', 'chat', 'manual'];
+const SOURCE_ORDER: ProposalSource[] = ['agent', 'article', 'material', 'linker', 'scene', 'simulation', 'template-gen', 'chat', 'manual'];
 
 function opDetail(p: Proposal): string {
   switch (p.op.kind) {
@@ -24,6 +24,8 @@ function opDetail(p: Proposal): string {
       return p.source === 'agent' ? '补全已有实体缺失的字段 / 标签 / 笔记，不覆盖现有数据' : `修改实体 ${p.op.entityId} 字段`;
     case 'addTemplate':
       return `新增模板：${p.op.template.name}`;
+    case 'addTimelineEvent':
+      return `新增时间线事件：${p.op.event.label}（${p.op.event.year}）`;
   }
 }
 

@@ -17,6 +17,7 @@ export type ProposalSource =
   | 'material' // 物料字段 AI 补全
   | 'linker' // 功能3：实体名称关联
   | 'scene' // 功能2：多模态设卡（图片→实体卡）
+  | 'simulation' // Phase 3：角色模拟推演事件采纳
   | 'template-gen' // 功能5：NL 创建模板
   | 'manual' // 手动
   | 'chat'; // 对话中直接发起的修改
@@ -46,7 +47,8 @@ export type ProposalOp =
   | { kind: 'addEntity'; entity: NewEntityInput }
   | { kind: 'addRelation'; source: string; target: string; type: RelationType; label?: string }
   | { kind: 'updateEntity'; entityId: string; patch: Partial<WikiEntity> }
-  | { kind: 'addTemplate'; template: MaterialTemplate };
+  | { kind: 'addTemplate'; template: MaterialTemplate }
+  | { kind: 'addTimelineEvent'; timelineId: string; event: { label: string; year: number; note?: string; impact?: number; entityId?: string } };
 
 export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
 
@@ -81,6 +83,7 @@ export const PROPOSAL_SOURCE_LABEL: Record<ProposalSource, string> = {
   material: '物料字段',
   linker: '实体关联',
   scene: '多模态设卡',
+  simulation: '角色模拟',
   'template-gen': '模板生成',
   manual: '手动',
   chat: '对话',

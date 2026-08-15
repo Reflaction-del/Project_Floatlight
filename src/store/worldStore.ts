@@ -6,6 +6,8 @@ import { GUIDE_DOCS } from '../seed/guide';
 import type { Proposal, ChatSession } from './proposalTypes';
 import type { OutlineNode } from '../features/outline/types';
 import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
+import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
+import { newSimulation, pushEvent } from '../features/simulation/simOps';
 import type {
   DocFile,
   WikiElement,
@@ -69,6 +71,8 @@ export interface WorldData {
   chats: ChatSession[];
   /** 全局大纲（Phase 1）：树形结构，parentId 递归任意深度 */
   outline: OutlineNode[];
+  /** 角色模拟（Phase 3）：多子代理沙盘/导演式会话 */
+  simulations: Simulation[];
   /** 演示种子版本号（仅演示世界带此字段）；< CURRENT_SEED_VERSION 时启动时强制升级到最新演示 */
   seedVersion?: number;
 }
@@ -172,6 +176,14 @@ interface WorldState {
   deleteOutlineNode: (id: string) => void;
   /** 移动节点到新父级/位置；非法（成环）返回 false */
   moveOutlineNode: (id: string, newParentId: string | null, newOrder: number) => boolean;
+  /* ——— 角色模拟（Phase 3） ——— */
+  addSimulation: (input: { mode: Simulation['mode']; title: string; scenario: string; actors: SubAgent[]; pacing?: Simulation['pacing']; autoSteps?: number; timeScale?: Simulation['timeScale']; stepBudget?: number }) => string;
+  updateSimulation: (id: string, patch: Partial<Simulation>) => void;
+  deleteSimulation: (id: string) => void;
+  /** 追加一条模拟事件（内部按 stepBudget 自动结束） */
+  pushSimEvent: (simId: string, ev: { actor: string; kind: SimEventKind; content: string }) => void;
+  /** 更新某个角色实例（人格词/模型/策略/记忆槽） */
+  updateSimulationActor: (simId: string, actorId: string, patch: Partial<SubAgent>) => void;
   deleteChat: (worldKey: string, id: string) => void;
 }
 
@@ -193,6 +205,7 @@ function emptyTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    simulations: [],
   };
 }
 function novelTemplate(): WorldData {
@@ -222,6 +235,7 @@ function novelTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    simulations: [],
   };
 }
 function scriptTemplate(): WorldData {
@@ -244,6 +258,7 @@ function scriptTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    simulations: [],
   };
 }
 
@@ -936,6 +951,7 @@ export const DEFAULT_DATA: WorldData = {
   proposals: [DEMO_PROPOSAL],
   chats: [],
   outline: [],
+    simulations: [],
 };
 
 let docSeq = 100;
@@ -1439,6 +1455,54 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       });
       return true;
     },
+    /* ——— 角色模拟（Phase 3） ——— */
+    addSimulation: (input) => {
+      const sim = newSimulation(input);
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations: [...(wd.simulations ?? []), sim] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return sim.id;
+    },
+    updateSimulation: (id, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => sim.id === id ? { ...sim, ...patch, id, updatedAt: Date.now() } : sim);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    deleteSimulation: (id) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).filter((sim) => sim.id !== id);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    pushSimEvent: (simId, ev) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => {
+          if (sim.id !== simId) return sim;
+          return pushEvent(sim, ev);
+        });
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    updateSimulationActor: (simId, actorId, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => {
+          if (sim.id !== simId) return sim;
+          return { ...sim, actors: sim.actors.map((a) => (a.id === actorId ? { ...a, ...patch, id: actorId } : a)) };
+        });
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
   } as WorldState;
 });
 
@@ -1457,6 +1521,14 @@ function dispatchProposal(p: Proposal) {
       break;
     case 'addTemplate':
       ws.addTemplate(p.op.template);
+      break;
+    case 'addTimelineEvent':
+      ws.addTimelineEvent(p.op.timelineId, {
+        label: p.op.event.label,
+        year: p.op.event.year,
+        note: p.op.event.note,
+        impact: p.op.event.impact,
+      });
       break;
   }
 }

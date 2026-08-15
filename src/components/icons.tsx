@@ -229,6 +229,18 @@ export function IconTrace(p: IconProps) {
   );
 }
 
+/* 角色模拟 — 双人剪影（Phase 3） */
+export function IconSimulation(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="8.5" cy="8" r="3" />
+      <path d="M3 19c0-3 2.5-4.5 5.5-4.5S14 16 14 19" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M14.5 18.5c.3-2.4 2-3.6 4-3.6s3.2 1.2 3.5 3.6" />
+    </Svg>
+  );
+}
+
 /* ===== 编辑器右键菜单专用图标 ===== */
 
 /* 从选区新建实体 — 方框加号 */
