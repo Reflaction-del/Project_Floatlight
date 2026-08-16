@@ -1,9 +1,15 @@
 # AGENTS.md — 浮光世界观编辑器 (Floating Light Worldbuilding Editor)
 
+
 本文件为在本仓库工作的 AI 助手提供项目背景、架构约定与工程红线。
 人工维护，请在本文件顶部追加变更，不要删除历史上下文。
 
-## 0. 自动化测试与提交门禁（2026-08-15 新增）
+## 0. CLI Agent 的测试与验证红线
+
+- **仅限 CLI agent 场景**：当以 CLI agent（如 `/claude-security` 的补丁生成等无人值守/受限环境）工作时，**不实际运行测试**，只做语法检查与逻辑核对（逐行复核变更区域、用 Node 探针验证纯函数），不执行编译/测试/启动应用；交付时如实声明「未跑编译与测试，仅语法/逻辑核对」，不声称行为经测试验证。非 CLI agent 的正常开发会话不受此限。
+- **修复漏洞后必须更新漏洞报告**：在 `CLAUDE-SECURITY-*/CLAUDE-SECURITY-RESULTS.md` 中把对应漏洞条目标注「已修复」（含提交号/补丁号、修复方式、验证情况），并在报告顶部 Update 表登记该次修复。
+
+## 0.1 自动化测试与提交门禁（2026-08-15 新增）
 
 - **测试框架**：vitest 4（`vitest.config.ts`，node 环境）。用例与源码同目录：`src/**/*.test.ts`。
 - **命令**：`npm test`（跑一次）/ `npm test:watch` / `npm run check`（test + build 全量门禁）。
@@ -18,7 +24,7 @@
 
 - **是什么**：面向小说作者、游戏策划、TRPG 主持人的**世界观管理工具**。把零散灵感整合为可用产出物（实体卡、关系图、时间线、视觉物料）。
 - **形态**：Electron 桌面应用（Windows 已发布，Android 通过 Capacitor 侧载）。**不是纯网页应用**，发布站仅做静态展示，不放本体运行。
-- **当前版本**：`v2.2.8`（Win）、`v2.2.6`（Android）。详见 `package.json` 的 `version` 与 `build` 段。
+- **当前版本**：`v2.2.9`（Win 与 Android 统一单一版本）。详见 `package.json` 的 `version` 与 `build` 段。
 - **开源仓库**：https://github.com/Reflaction-del/Project_Floatlight
   - 介绍站（GitHub Pages）：https://Reflaction-del.github.io/Project_Floatlight/
   - 下载（GitHub Releases）：https://github.com/Reflaction-del/Project_Floatlight/releases
@@ -97,11 +103,16 @@ android/           Capacitor Android 工程（cap sync 自动重建）
 
 ## 6. 打包与发布红线
 
-### 冲版本（三处必须同步改，否则产物名仍是旧号）
+### 冲版本（用 bump 脚本，一处改处处改）
 
-`package.json` 的：`version` + `build.nsis.artifactName` + `build.portable.artifactName`。
-Android 额外：手动改 `android/app/build.gradle` 的 `versionCode`(递增整数) / `versionName`（Capacitor sync **不会**自动同步版本号）。
-发版后删 `release/` 下被取代的旧版 exe/Setup/blockmap。
+发版升号统一用 `npm run version:bump -- <新版本>`（如 `2.3.0`），脚本自动同步：
+`package.json` 的 `version` → `android/app/build.gradle` 的 `versionName` + `versionCode` → `README.md` / `AGENTS.md` / `docs/preview-*.html` 中的版本串。
+跑完**人工** `git add && git commit`（脚本不自动提交）。
+
+- **真相源唯一**：`package.json` 的 `version`。`build.nsis.artifactName` / `build.portable.artifactName` 已改用 electron-builder `${version}` 宏，构建时自动填号，**无需手动改产物名**。
+- **versionCode 编码**：`parseInt("20"+主+次+补丁)`（示例：1.0.0→20100；示例用历史版本号，避免被 bump 脚本误改）。⚠ 已知局限：minor/patch 跨 10 时非严格单调（`2.3.0=20230 < 2.2.99=202299`），先发 `2.2.10+` 再发 `2.3.0` 会导致 Android 无法升级；进入该区间前需改用 `major*10000+minor*100+patch` 并一次性跳高（见 `src/utils/versionBump.ts` 的 KNOWN LIMITATION 测试）。
+- Android `cap sync` 仍**不会**自动同步版本号——但 build.gradle 已由 bump 脚本改好，`cap sync` 前先跑 bump。
+- 发版后删 `release/` 下被取代的旧版 exe/Setup/blockmap。
 
 ### 桌面构建
 

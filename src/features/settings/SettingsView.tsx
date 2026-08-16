@@ -760,7 +760,7 @@ export function SettingsView() {
 
         <section className="set-section">
           <h3>关于</h3>
-          <p className="tip">浮光 · AI 世界观编辑器 v2.0.0。</p>
+          <p className="tip">浮光 v{__APP_VERSION__} · commit {__APP_COMMIT__}</p>
           <p className="tip" style={{ marginTop: 4 }}>浮光掠影间，不过三千世界。</p>
           <p className="tip" style={{ marginTop: 2 }}>本应用由Agent智能体开发，其中所有代码均为AI生成。</p>
         </section>

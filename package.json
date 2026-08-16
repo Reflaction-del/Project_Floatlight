@@ -15,7 +15,8 @@
     "prepare": "husky",
     "preview": "vite preview",
     "electron:dev": "vite build && electron .",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:win": "npm run build && electron-builder --win",
+    "version:bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -143,11 +144,11 @@
       "createStartMenuShortcut": true,
       "language": "2052",
       "shortcutName": "浮光世界观编辑器",
-      "artifactName": "浮光世界观编辑器_v2.2.9_Setup.exe",
+      "artifactName": "浮光世界观编辑器_v${version}_Setup.exe",
       "runAfterFinish": true
     },
     "portable": {
-      "artifactName": "浮光世界观编辑器_v2.2.9.exe"
+      "artifactName": "浮光世界观编辑器_v${version}.exe"
     },
     "directories": {
       "output": "release"

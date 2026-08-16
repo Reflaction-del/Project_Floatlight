@@ -1,6 +1,10 @@
 // Electron 预加载注入的渲染进程 API
 export {};
 declare global {
+  /** 构建时注入的版本号（见 vite.config.ts 的 define，来源 package.json version） */
+  const __APP_VERSION__: string;
+  /** 构建时注入的 commit 短值（git rev-parse --short HEAD，git 不可用时为 'unknown'） */
+  const __APP_COMMIT__: string;
   interface Window {
     api?: {
       /** 唤起系统文件选择器，返回图片的 dataURL 或 null */

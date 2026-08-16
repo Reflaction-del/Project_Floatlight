@@ -87,7 +87,7 @@ describe('appendMemory（记忆槽）', () => {
     for (let i = 0; i < MEMORY_SLOT_MAX + 5; i++) a = appendMemory(a, `经历${i}`);
     expect(a.memorySlot).toHaveLength(MEMORY_SLOT_MAX);
     expect(a.memorySlot[0]).toBe('经历5'); // 最早 5 条被丢弃（15-10=5）
-    expect(a.memorySlot.at(-1)).toBe('经历14');
+    expect(a.memorySlot[a.memorySlot.length - 1]).toBe('经历14');
   });
 });
 
