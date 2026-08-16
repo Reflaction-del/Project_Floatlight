@@ -4,6 +4,7 @@ import { useAIStore, type AIModel, type EmbeddingModel, type PromptFormat } from
 import { useAIUsageStore, type AIUsageFeature } from '../store/aiUsageStore';
 import { useWorldStore } from '../store/worldStore';
 import * as agentRegistry from '../features/agent/registry';
+import { buildAssistantSystem } from '../features/agent/assistantGuide';
 import { logAI } from './aiLog';
 
 /** 多模态内容片段：纯文本 或 图片（dataURL）。Chat 格式（OpenAI 兼容）原样支持。 */
@@ -81,9 +82,16 @@ export function getAllModels() {
   return useAIStore.getState().models;
 }
 
-/** 拼装 chat 格式的 messages 数组 */
+/** 拼装 chat 格式的 messages 数组
+ * systemDefault 为「助手操作手册」（buildAssistantSystem 产物，始终在）；
+ * systemOverride（如约束模式）作为附加任务上下文，不再覆盖手册。 */
 function buildMessages(model: AIModel, systemDefault: string, history: AIMessage[], systemOverride?: string): AIMessage[] {
-  const sys = systemOverride ?? model.systemPrompt ?? systemDefault;
+  const guide = systemDefault || '你是一个专业的写作和世界观构建助手。';
+  const extra = systemOverride ?? model.systemPrompt ?? '';
+  const sys = extra ? `${guide}
+
+【本次任务上下文】
+${extra}` : guide;
   const msgs: AIMessage[] = [];
   if (sys) msgs.push({ role: 'system', content: sys });
   msgs.push(...history);
@@ -236,7 +244,7 @@ export async function chatStream(
   opts?: ChatStreamOpts,
 ): Promise<void> {
   const format: PromptFormat = model.format ?? 'chat';
-  const systemDefault = '你是一个专业的写作和世界观构建助手。';
+  const systemDefault = buildAssistantSystem(contentText(history[history.length - 1]?.content ?? ''));
   const base = model.endpoint.replace(/\/+$/, '');
   const sysDefault = opts?.systemOverride ?? systemDefault;
   const enableTools = opts?.enableTools !== false; // 默认开启（P5）
@@ -665,7 +673,7 @@ export interface ChatOnceOpts {
 export async function chatOnce(model: AIModel, history: AIMessage[], opts?: ChatOnceOpts | AbortSignal): Promise<string> {
   const options: ChatOnceOpts = opts instanceof AbortSignal ? { signal: opts } : (opts ?? {});
   const format: PromptFormat = model.format ?? 'chat';
-  const systemDefault = '你是一个专业的写作和世界观构建助手。';
+  const systemDefault = buildAssistantSystem(contentText(history[history.length - 1]?.content ?? ''));
   const base = model.endpoint.replace(/\/+$/, '');
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${model.apiKey}` };
 
