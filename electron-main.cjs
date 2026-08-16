@@ -7,6 +7,13 @@ const crypto = require('crypto');
 const os = require('os');
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, session } = require('electron');
 
+// —— E2E 测试基础设施：隔离用户数据目录 ——
+// 仅当显式设置环境变量 FLOATLIGHT_USER_DATA 时生效（Playwright 自动化测试用），
+// 避免测试读写真实用户数据（boot 快照 / AI Key / bridge 配置等）。必须在 app ready 前调用。
+if (process.env.FLOATLIGHT_USER_DATA) {
+  app.setPath('userData', process.env.FLOATLIGHT_USER_DATA);
+}
+
 const DIST = path.join(app.getAppPath(), 'dist');
 const PRELOAD = path.join(app.getAppPath(), 'preload.cjs');
 
@@ -925,7 +932,7 @@ async function createWindow() {
   // 避免 Electron 新版 beforeunload 不再弹窗导致“无法关闭且无提示”的问题。
   let allowClose = false;
   win.on('close', async (e) => {
-    if (allowClose || isRelaunching) return;
+    if (allowClose || isRelaunching || process.env.FLOATLIGHT_E2E) return;
     e.preventDefault();
     const { response } = await dialog.showMessageBox(win, {
       type: 'question',

@@ -11,6 +11,7 @@ import { useWorldStore } from '../../store/worldStore';
 import { useUIStore } from '../../store/uiStore';
 import { treeify, type OutlineTreeNode } from './outlineOps';
 import { scanForeshadow } from './foreshadowLedger';
+import { uniqueDocTitle } from '../../utils/docConflict';
 import {
   OUTLINE_KIND_LABEL,
   OUTLINE_STATUS_LABEL,
@@ -34,8 +35,8 @@ function OutlineNodeItem({ node, depth }: { node: OutlineTreeNode; depth: number
   const move = useWorldStore((s) => s.moveOutlineNode);
   const add = useWorldStore((s) => s.addOutlineNode);
   const openTab = useUIStore((s) => s.openTab);
-  const [showLedger, setShowLedger] = useState(false);
   const docs = useWorldStore((s) => (s.worldsData[s.current]?.docs ?? []));
+  const addDoc = useWorldStore((s) => s.addDoc);
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(node.title);
@@ -107,17 +108,57 @@ function OutlineNodeItem({ node, depth }: { node: OutlineTreeNode; depth: number
         </span>
         {!editing && (
           <span className="ol-links">
-            {node.docId && (
-              <button
-                className="ol-link"
-                title="打开关联文档"
-                onClick={() => {
-                  const d = docs.find((x) => x.id === node.docId);
-                  openTab({ title: d?.title ?? '文档', icon: 'doc', kind: 'doc', ref: node.docId! });
-                }}
-              >
-                文
-              </button>
+            {node.docId ? (
+              <>
+                <button
+                  className="ol-link"
+                  title="打开关联文档"
+                  onClick={() => {
+                    const d = docs.find((x) => x.id === node.docId);
+                    openTab({ title: d?.title ?? '文档', icon: 'doc', kind: 'doc', ref: node.docId! });
+                  }}
+                >
+                  文
+                </button>
+                <button className="ol-link" title="取消关联文档" onClick={() => update(node.id, { docId: undefined as any })}>✕</button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="ol-link add"
+                  title="在此节点创建文档并关联"
+                  onClick={() => {
+                    const st = useWorldStore.getState();
+                    const wd = st.worldsData[st.current];
+                    if (!wd) return;
+                    const title = uniqueDocTitle(wd.docs ?? [], node.title || '未命名');
+                    st.addDoc(title, wd.folders?.[0] || '未分组');
+                    const created = (useWorldStore.getState().worldsData[useWorldStore.getState().current]?.docs ?? []).slice(-1)[0];
+                    if (created) {
+                      update(node.id, { docId: created.id });
+                      openTab({ title, icon: 'doc', kind: 'doc', ref: created.id });
+                    }
+                  }}
+                >
+                  ＋文
+                </button>
+                <select
+                  className="ol-link-select"
+                  defaultValue=""
+                  title="关联已有文档"
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) return;
+                    update(node.id, { docId: id });
+                    const d = docs.find((x) => x.id === id);
+                    if (d) openTab({ title: d.title, icon: 'doc', kind: 'doc', ref: id });
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">关联…</option>
+                  {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                </select>
+              </>
             )}
             {node.summary && <span className="ol-summary" title={node.summary}>{node.summary}</span>}
           </span>
@@ -202,25 +243,7 @@ export function OutlineView() {
           tree.map((n) => <OutlineNodeItem key={n.id} node={n} depth={0} />)
         )}
       </div>
-      {docs.length > 0 && (
-        <div className="outline-assoc">
-          <span className="tip">关联文档（在节点操作后选）：</span>
-          <select
-            className="ol-select"
-            defaultValue=""
-            onChange={(e) => {
-              const id = e.target.value;
-              if (!id) return;
-              // 关联到第一个根节点（简化入口）；更精确的关联在节点行内
-              if (tree[0]) update(tree[0].id, { docId: id });
-              e.target.value = '';
-            }}
-          >
-            <option value="">关联到首个顶层节点…</option>
-            {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
-          </select>
-        </div>
-      )}
+
     </div>
   );
 }

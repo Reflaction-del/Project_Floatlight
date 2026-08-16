@@ -5,6 +5,9 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useWorldStore } from '../../store/worldStore';
 import { chatOnce } from '../../utils/ai';
 import { useAIStore } from '../../store/aiStore';
+import { useUIStore } from '../../store/uiStore';
+import { textToTipTapDoc, stripHtml } from '../../utils/textToDoc';
+import { uniqueDocTitle } from '../../utils/docConflict';
 
 function hasText(html: string) {
   const div = document.createElement('div');
@@ -19,15 +22,33 @@ function hasText(html: string) {
       alert('AI 分析结果：\n' + r);
     } catch (e: any) { alert('AI 分析失败：' + (e.message || e)); }
   };
+  /** 草稿 → 文档（纯本地，不依赖 AI）：原文填入新文档，同名自动编号 */
+  const doConvertToDoc = (d: any) => {
+    if (!d) return;
+    const st = useWorldStore.getState();
+    const wd = st.worldsData[st.current];
+    if (!wd) return;
+    const rawTitle = (d.title || '').trim() || '来自草稿';
+    const title = uniqueDocTitle(wd.docs ?? [], rawTitle);
+    st.addDoc(title, wd.folders?.[0] || '未分组');
+    const created = (useWorldStore.getState().worldsData[useWorldStore.getState().current]?.docs ?? []).slice(-1)[0];
+    const id = created?.id ?? '';
+    const text = stripHtml(d.content);
+    if (text) st.updateDocContent(id, textToTipTapDoc(text));
+    if (id) useUIStore.getState().openTab({ title, icon: 'doc', kind: 'doc', ref: id });
+    alert(`已转为文档「${title}」${title !== rawTitle ? `（原草稿同名，已自动编号）` : ''}。草稿已保留，可手动删除。`);
+  };
+
   const doAIConvert = async (d: any, type: 'doc' | 'timeline') => {
     if (!d) return;
     const cfg = useAIStore.getState().getCurrent();
     if (!cfg) { alert('请先在设置中配置 AI API'); return; }
-    const text = (d.content || '').replace(/<[^>]+>/g, '');
     if (type === 'doc') {
-      useWorldStore.getState().addDoc(d.title || '来自草稿', useWorldStore.getState().worldsData[useWorldStore.getState().current]?.folders[0] || '未分组');
-      alert('已转化为文档！');
-    } else {
+      doConvertToDoc(d); // 本地直转（原文入文档），无需 AI
+      return;
+    }
+    const text = (d.content || '').replace(/<[^>]+>/g, '');
+    {
       try {
         const r = await chatOnce(cfg, [{ role: 'user', content: `从以下内容中提取一个时间点（年份数字）和事件名称，只输出"年份|事件名"格式，不要其他文字：\n\n${text}` }], { feature: 'draft-analyze' });
         const parts = r.split('|');
@@ -76,15 +97,33 @@ export function DraftsView() {
       alert('AI 分析结果：\n' + r);
     } catch (e: any) { alert('AI 分析失败：' + (e.message || e)); }
   };
+  /** 草稿 → 文档（纯本地，不依赖 AI）：原文填入新文档，同名自动编号 */
+  const doConvertToDoc = (d: any) => {
+    if (!d) return;
+    const st = useWorldStore.getState();
+    const wd = st.worldsData[st.current];
+    if (!wd) return;
+    const rawTitle = (d.title || '').trim() || '来自草稿';
+    const title = uniqueDocTitle(wd.docs ?? [], rawTitle);
+    st.addDoc(title, wd.folders?.[0] || '未分组');
+    const created = (useWorldStore.getState().worldsData[useWorldStore.getState().current]?.docs ?? []).slice(-1)[0];
+    const id = created?.id ?? '';
+    const text = stripHtml(d.content);
+    if (text) st.updateDocContent(id, textToTipTapDoc(text));
+    if (id) useUIStore.getState().openTab({ title, icon: 'doc', kind: 'doc', ref: id });
+    alert(`已转为文档「${title}」${title !== rawTitle ? `（原草稿同名，已自动编号）` : ''}。草稿已保留，可手动删除。`);
+  };
+
   const doAIConvert = async (d: any, type: 'doc' | 'timeline') => {
     if (!d) return;
     const cfg = useAIStore.getState().getCurrent();
     if (!cfg) { alert('请先在设置中配置 AI API'); return; }
-    const text = (d.content || '').replace(/<[^>]+>/g, '');
     if (type === 'doc') {
-      useWorldStore.getState().addDoc(d.title || '来自草稿', useWorldStore.getState().worldsData[useWorldStore.getState().current]?.folders[0] || '未分组');
-      alert('已转化为文档！');
-    } else {
+      doConvertToDoc(d); // 本地直转（原文入文档），无需 AI
+      return;
+    }
+    const text = (d.content || '').replace(/<[^>]+>/g, '');
+    {
       try {
         const r = await chatOnce(cfg, [{ role: 'user', content: `从以下内容中提取一个时间点（年份数字）和事件名称，只输出"年份|事件名"格式，不要其他文字：\n\n${text}` }], { feature: 'draft-analyze' });
         const parts = r.split('|');
@@ -207,15 +246,33 @@ function DraftEditor({
       alert('AI 分析结果：\n' + r);
     } catch (e: any) { alert('AI 分析失败：' + (e.message || e)); }
   };
+  /** 草稿 → 文档（纯本地，不依赖 AI）：原文填入新文档，同名自动编号 */
+  const doConvertToDoc = (d: any) => {
+    if (!d) return;
+    const st = useWorldStore.getState();
+    const wd = st.worldsData[st.current];
+    if (!wd) return;
+    const rawTitle = (d.title || '').trim() || '来自草稿';
+    const title = uniqueDocTitle(wd.docs ?? [], rawTitle);
+    st.addDoc(title, wd.folders?.[0] || '未分组');
+    const created = (useWorldStore.getState().worldsData[useWorldStore.getState().current]?.docs ?? []).slice(-1)[0];
+    const id = created?.id ?? '';
+    const text = stripHtml(d.content);
+    if (text) st.updateDocContent(id, textToTipTapDoc(text));
+    if (id) useUIStore.getState().openTab({ title, icon: 'doc', kind: 'doc', ref: id });
+    alert(`已转为文档「${title}」${title !== rawTitle ? `（原草稿同名，已自动编号）` : ''}。草稿已保留，可手动删除。`);
+  };
+
   const doAIConvert = async (d: any, type: 'doc' | 'timeline') => {
     if (!d) return;
     const cfg = useAIStore.getState().getCurrent();
     if (!cfg) { alert('请先在设置中配置 AI API'); return; }
-    const text = (d.content || '').replace(/<[^>]+>/g, '');
     if (type === 'doc') {
-      useWorldStore.getState().addDoc(d.title || '来自草稿', useWorldStore.getState().worldsData[useWorldStore.getState().current]?.folders[0] || '未分组');
-      alert('已转化为文档！');
-    } else {
+      doConvertToDoc(d); // 本地直转（原文入文档），无需 AI
+      return;
+    }
+    const text = (d.content || '').replace(/<[^>]+>/g, '');
+    {
       try {
         const r = await chatOnce(cfg, [{ role: 'user', content: `从以下内容中提取一个时间点（年份数字）和事件名称，只输出"年份|事件名"格式，不要其他文字：\n\n${text}` }], { feature: 'draft-analyze' });
         const parts = r.split('|');
@@ -238,7 +295,7 @@ function DraftEditor({
           className="draft-title-input"
         />
         <button className="mode-btn" onClick={onAIConvert('timeline')} title="用 AI 从内容中提取关键时间点，创建时间轴事件">转事件</button>
-          <button className="mode-btn" onClick={onAIConvert('doc')} title="用 AI 从内容中提取要点，创建新文档">转文档</button>
+          <button className="mode-btn" onClick={onAIConvert('doc')} title="草稿原文转为新文档（本地，不依赖 AI），同名自动编号">转文档</button>
           <button className="mode-btn" onClick={onAIAnalyze} title="用 AI 分析内容结构，提取摘要">分析</button>
           <button className="mode-btn danger" onClick={onDelete} style={{ marginLeft: 'auto' }}>删除</button>
       </div>

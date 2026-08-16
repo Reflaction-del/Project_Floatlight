@@ -68,14 +68,24 @@ export function TabBar() {
     if (!q) return [];
     const wd = useWorldStore.getState().worldsData[useWorldStore.getState().current];
     if (!wd) return [];
-    const out: { label: string; icon: string; kind: 'doc' | 'timeline' | 'drafts'; ref: string; desc?: string }[] = [];
+    const out: { label: string; icon: string; kind: 'doc' | 'timeline' | 'drafts' | 'entity' | 'outline'; ref: string; desc?: string }[] = [];
     wd.docs.forEach((d) => { if (d.title.toLowerCase().includes(q)) out.push({ label: d.title, icon: d.icon, kind: 'doc', ref: d.id, desc: d.folder }); });
     wd.drafts.forEach((d) => { if (d.title.toLowerCase().includes(q) || d.content.toLowerCase().includes(q)) out.push({ label: d.title, icon: 'drafts', kind: 'drafts', ref: d.id, desc: '草稿' }); });
     wd.timelines.forEach((t) => {
       if (t.name.toLowerCase().includes(q)) out.push({ label: t.name, icon: 'timeline', kind: 'timeline', ref: t.id, desc: '时间轴' });
       t.events.forEach((e) => { if (e.label.toLowerCase().includes(q) || (e.note || '').toLowerCase().includes(q)) out.push({ label: e.label, icon: '•', kind: 'timeline', ref: t.id, desc: `${t.name} 事件` }); });
     });
-    return out.slice(0, 20);
+    // 实体（名称/标签/备注）
+    (wd.entities ?? []).forEach((e) => {
+      const noteHit = (e.note || '').toLowerCase().includes(q);
+      const tagHit = (e.tags ?? []).some((t) => t.toLowerCase().includes(q));
+      if (e.name.toLowerCase().includes(q) || noteHit || tagHit) out.push({ label: e.name, icon: 'entities', kind: 'entity', ref: e.id, desc: tagHit ? `标签：${e.tags?.join('/')}` : noteHit ? '备注命中' : '实体' });
+    });
+    // 大纲节点（标题/摘要）
+    (wd.outline ?? []).forEach((n) => {
+      if (n.title.toLowerCase().includes(q) || (n.summary || '').toLowerCase().includes(q)) out.push({ label: n.title, icon: 'outline', kind: 'outline', ref: 'outline', desc: '大纲节点' });
+    });
+    return out.slice(0, 30);
   }, [searchQ]);
 
   const onSearchResultClick = (r: typeof searchResults[number]) => {
@@ -83,6 +93,8 @@ export function TabBar() {
     if (r.kind === 'doc') openTab({ title: r.label, icon: r.icon, kind: 'doc', ref: r.ref });
     else if (r.kind === 'timeline') openTab({ title: r.label, icon: 'timeline', kind: 'timeline', ref: r.ref });
     else if (r.kind === 'drafts') openTab({ title: '草稿箱', icon: 'drafts', kind: 'drafts', ref: 'drafts' });
+    else if (r.kind === 'entity') openTab({ title: r.label, icon: 'entities', kind: 'entity', ref: r.ref });
+    else if (r.kind === 'outline') openTab({ title: '全局大纲', icon: 'outline', kind: 'outline', ref: 'outline' });
   };
 
   return (
@@ -137,7 +149,7 @@ export function TabBar() {
           id="global-search-input"
           type="text"
           className="global-search"
-          placeholder="搜索 文档 / 草稿 / 时间轴 / 可视化"
+          placeholder="搜索 文档 / 实体 / 大纲 / 草稿 / 时间轴 / 可视化"
           value={searchQ}
           onChange={(e) => { setSearchQ(e.target.value); setSearchIdx(-1); setSearchOpen(true); }}
           onFocus={() => searchQ && setSearchOpen(true)}

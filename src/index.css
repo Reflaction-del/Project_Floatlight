@@ -3930,3 +3930,7 @@ button:active,
 .ol-ledger-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 12.5px; border-radius: 6px; }
 .ol-ledger-item:hover { background: rgba(0,0,0,.03); }
 .ol-ledger-node { font-weight: 600; }
+
+/* 大纲节点行内：关联文档操作 */
+.ol-link.add { color: #2ea043; font-weight: 700; }
+.ol-link-select { font-size: 11px; padding: 1px 4px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: inherit; max-width: 90px; }

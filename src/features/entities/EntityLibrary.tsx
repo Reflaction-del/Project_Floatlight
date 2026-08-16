@@ -54,6 +54,14 @@ export function EntityLibrary() {
 
   const doAdd = () => {
     const name = newName.trim() || `${ENTITY_LABEL[newType]}·未命名`;
+    // 即时查重：同类型同名 → 确认创建副本；跨类型同名 → 弱提示
+    const dupSame = entities.find((e) => e.name === name && e.type === newType);
+    if (dupSame) {
+      if (!window.confirm(`已存在同类型实体「${name}」，仍要创建副本吗？（建议改名或改用已有实体）`)) return;
+    } else {
+      const dupCross = entities.find((e) => e.name === name && e.type !== newType);
+      if (dupCross && !window.confirm(`其他类型已存在实体「${name}」，仍要创建吗？`)) return;
+    }
     const id = addEntity({ type: newType, name, fields: ENTITY_TEMPLATES.find((t) => t.type === newType)!.fields.map((f) => ({ label: f.label, value: '', kind: f.kind, entityType: f.entityType })) });
     setNewName('');
     setAdding(false);
