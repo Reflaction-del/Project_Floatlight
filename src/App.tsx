@@ -7,6 +7,7 @@ import { useRecentFilesStore } from './store/recentFilesStore';
 import { Toolbar } from './components/Toolbar';
 import { FileTree } from './components/FileTree';
 import { CopilotSidebar } from './components/CopilotSidebar';
+import { DockShell } from './components/DockShell';
 import { ProposalCenter } from './components/ProposalCenter';
 import { AILogPanel } from './components/AILogPanel';
 import { TabBar } from './components/TabBar';
@@ -119,7 +120,7 @@ function runKeymapAction(action: KeymapAction) {
   }
 }
 
-function TabContent({ tab, mode }: { tab: TabItem; mode: EditorMode }) {
+export function TabContent({ tab, mode }: { tab: TabItem; mode: EditorMode }) {
   if (tab.kind === 'doc') return <Editor key={tab.ref} docId={tab.ref} mode={mode} />;
   if (tab.kind === 'timeline') return <TimelineView key={tab.ref} timelineId={tab.ref} />;
   if (tab.kind === 'entity') return <EntityEditor key={tab.ref} entityId={tab.ref} />;
@@ -149,7 +150,7 @@ function TabContent({ tab, mode }: { tab: TabItem; mode: EditorMode }) {
   }
 }
 
-function Main() {
+export function Main() {
   const tabs = useUIStore((s) => s.tabs);
   const activeTabId = useUIStore((s) => s.activeTabId);
   const splitTabId = useUIStore((s) => s.splitTabId);
@@ -318,9 +319,7 @@ export default function App() {
       {titleBar === 'custom' && <TitleBar />}
       <div className={'shell' + (titleBar === 'custom' ? ' with-custom-titlebar' : '')}>
         <Toolbar />
-        {fileTreeOpen && <FileTree />}
-        <Main />
-        {copilotOpen && <CopilotSidebar />}
+        <DockShell />
         <ProposalCenter />
         <AILogPanel />
         <TracePanel />

@@ -3941,3 +3941,34 @@ button:active,
 .tab-ctx-menu { position: fixed; z-index: 3000; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); padding: 4px; min-width: 110px; }
 .tab-ctx-menu button { display: block; width: 100%; text-align: left; padding: 6px 10px; font-size: 12px; border: none; background: transparent; color: inherit; border-radius: 6px; cursor: pointer; }
 .tab-ctx-menu button:hover { background: rgba(0,0,0,.06); }
+
+/* ============ Dock 布局系统（Workspace） ============ */
+.dock-shell { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.dock-main-row { display: flex; flex: 1; min-height: 0; }
+.dock { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.dock-center { flex: 1; }
+.dock-left { border-right: 1px solid var(--border); }
+.dock-right { border-left: 1px solid var(--border); }
+.dock-bottom { border-top: 1px solid var(--border); }
+.dock-tabs { display: flex; gap: 2px; padding: 4px 8px 0; overflow-x: auto; flex: none; }
+.dock-tab { padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 6px 6px 0 0; opacity: .65; white-space: nowrap; user-select: none; }
+.dock-tab.active { background: var(--bg-2, rgba(128,128,128,.12)); opacity: 1; }
+.dock-tab-close { margin-left: 5px; opacity: .55; }
+.dock-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.dock-panel-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 11px; opacity: .75; border-bottom: 1px solid var(--border); cursor: grab; user-select: none; flex: none; }
+.dock-panel-head:active { cursor: grabbing; }
+.dock-panel-drag-tip { opacity: .4; }
+.dock-panel-close { margin-left: auto; opacity: .5; cursor: pointer; background: none; border: none; color: inherit; font-size: 12px; }
+.dock-panel-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.dock-panel-body .copilot { width: 100% !important; min-width: 0 !important; height: 100%; }
+.dock-hover { outline: 2px dashed var(--accent, #4f8cff); outline-offset: -2px; }
+.dock-panel-empty { padding: 24px; opacity: .6; }
+
+/* 工作区菜单 */
+.ws-menu { position: fixed; z-index: 3000; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 6px; min-width: 190px; top: 50px; right: 300px; }
+.ws-menu-title { padding: 4px 8px; font-size: 11px; opacity: .6; }
+.ws-item { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 8px; font-size: 12px; border: none; background: transparent; color: inherit; border-radius: 6px; cursor: pointer; text-align: left; }
+.ws-item:hover { background: rgba(128,128,128,.12); }
+.ws-item.active { background: rgba(128,128,128,.18); }
+.ws-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.ws-del { opacity: .5; margin-left: 10px; padding: 0 4px; }

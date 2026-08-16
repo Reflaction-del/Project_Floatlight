@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useUIStore } from '../store/uiStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { WORKSPACE_PRESETS } from '../features/workspace/presets';
+import { usePromptStore } from '../store/promptStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
 import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice } from './icons';
@@ -13,16 +16,35 @@ const TEMPLATES = [
 
 export function Toolbar() {
   const openTab = useUIStore((s) => s.openTab);
+  /** 模块打开：若该模块已在某个 dock 面板则激活面板，否则开新 tab */
+  const openModule = (ref: string, title: string, icon: string) => {
+    const ws = useWorkspaceStore.getState();
+    const dockKey = (Object.keys(ws.docks) as Array<keyof typeof ws.docks>).find((d) => ws.docks[d].panels.some((p) => p.id === ref));
+    if (dockKey) {
+      useWorkspaceStore.setState((st) => ({ docks: { ...st.docks, [dockKey]: { ...st.docks[dockKey], active: ref } } }));
+      return;
+    }
+    openTab({ title, icon, kind: 'module', ref });
+  };
   const closeAllTabs = useUIStore((s) => s.closeTab);
   const switchWorld = useWorldStore((s) => s.switchWorld);
   const addWorldData = useWorldStore((s) => s.addWorld);
   const saveNow = useWorldStore((s) => s.saveNow);
   const tabs = useUIStore((s) => s.tabs);
   const setSplitTab = useUIStore((s) => s.setSplitTab);
-  const fileTreeOpen = useUIStore((s) => s.fileTreeOpen);
-  const copilotOpen = useUIStore((s) => s.copilotOpen);
-  const toggleFileTree = useUIStore((s) => s.toggleFileTree);
-  const toggleCopilot = useUIStore((s) => s.toggleCopilot);
+  const wsDocks = useWorkspaceStore((s) => s.docks);
+  const fileTreeOpen = wsDocks.left.panels.some((p) => p.id === 'filetree');
+  const copilotOpen = wsDocks.right.panels.some((p) => p.id === 'copilot');
+  const toggleFileTree = () => {
+    const ws = useWorkspaceStore.getState();
+    if (ws.docks.left.panels.some((p) => p.id === 'filetree')) ws.closePanel('filetree');
+    else ws.addPanel('filetree', 'left');
+  };
+  const toggleCopilot = () => {
+    const ws = useWorkspaceStore.getState();
+    if (ws.docks.right.panels.some((p) => p.id === 'copilot')) ws.closePanel('copilot');
+    else ws.addPanel('copilot', 'right');
+  };
   const showProposals = useUIStore((s) => s.showProposals);
   const toggleProposals = useUIStore((s) => s.toggleProposals);
   const showTrace = useUIStore((s) => s.showTrace);
@@ -33,6 +55,17 @@ export function Toolbar() {
   const [savedFlash, setSavedFlash] = useState(false);
   const activeModule = useUIStore((s) => s.module);
 
+  const [wsOpen, setWsOpen] = useState(false);
+  const wsCurrentId = useWorkspaceStore((s) => s.currentId);
+  const wsCustoms = useWorkspaceStore((s) => s.customs);
+  const prompt = usePromptStore((s) => s.open);
+  const switchWs = (id: string) => { useWorkspaceStore.getState().switchWorkspace(id); setWsOpen(false); };
+  const saveWs = async () => {
+    const v = await prompt({ title: '保存当前布局', fields: [{ name: 'name', label: '布局名称', placeholder: '如：我的物料布局', default: '自定义布局' }] });
+    if (!v?.name) return;
+    useWorkspaceStore.getState().saveAsCustom(v.name);
+    setWsOpen(false);
+  };
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const onSave = () => {
     saveNow();
@@ -72,6 +105,37 @@ export function Toolbar() {
       <button className={'tool-btn' + (activeModule === 'share' ? ' mod-active' : '')} title="协作与分享" onClick={() => openTab({ title: '协作与分享', icon: 'share', kind: 'module', ref: 'share' })}><IconShare /></button>
       <button className={'tool-btn' + (activeModule === 'materials' ? ' mod-active' : '')} title="可视化编辑器（视觉物料生成：角色卡 / 插图 / 批量导出 PNG·PDF）" onClick={() => openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' })}><IconMaterials /></button>
       <span className="spacer" style={{ flex: 1 }} />
+      <button
+        className={'tool-btn' + (wsOpen ? ' active' : '')}
+        title="工作区（按创作场景切换布局，可拖拽面板到任意停靠区）"
+        onClick={() => setWsOpen((v) => !v)}
+      >
+        <IconGlobe />
+      </button>
+      {wsOpen && (
+        <div className="ws-menu" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="ws-menu-title">工作区布局</div>
+          {WORKSPACE_PRESETS.map((w) => (
+            <button key={w.id} className={'ws-item' + (w.id === wsCurrentId ? ' active' : '')} onClick={() => switchWs(w.id)}>
+              {w.name}
+            </button>
+          ))}
+          {wsCustoms.length > 0 && (
+            <>
+              <div className="ws-menu-sep" />
+              {wsCustoms.map((c) => (
+                <button key={c.id} className={'ws-item' + (c.id === wsCurrentId ? ' active' : '')} onClick={() => switchWs(c.id)}>
+                  {c.name}
+                  <span className="ws-del" onClick={(e) => { e.stopPropagation(); useWorkspaceStore.getState().deleteCustom(c.id); }} title="删除">×</span>
+                </button>
+              ))}
+            </>
+          )}
+          <div className="ws-menu-sep" />
+          <button className="ws-item" onClick={saveWs}>＋ 保存当前布局为…</button>
+          <button className="ws-item" onClick={() => { useWorkspaceStore.getState().resetToDefault(); setWsOpen(false); }}>↺ 重置为默认</button>
+        </div>
+      )}
       <button
         className={'tool-btn' + (fileTreeOpen ? ' active' : '')}
         title={fileTreeOpen ? '收起文件树' : '展开文件树'}
