@@ -18,7 +18,7 @@ export const WORKSPACE_PRESETS: Workspace[] = [
       left: dock([{ id: 'filetree', kind: 'filetree', title: '文件', icon: 'folder' }], 'filetree', 240),
       center: dock([{ id: 'main', kind: 'module', title: '编辑器', icon: 'doc', ref: '__main__' }], 'main', 0),
       right: dock([{ id: 'copilot', kind: 'copilot', title: 'AI 协作者', icon: 'copilot' }], 'copilot', 360),
-      bottom: dock([], null, 180),
+      bottom: dock([{ id: 'ailog', kind: 'ailog', title: 'AI 日志', icon: 'log' }], 'ailog', 170),
     },
   },
   {
@@ -45,7 +45,7 @@ export const WORKSPACE_PRESETS: Workspace[] = [
       left: dock([{ id: 'outline', kind: 'module', title: '全局大纲', icon: 'outline', ref: 'outline' }], 'outline', 300),
       center: dock([{ id: 'main', kind: 'module', title: '编辑器', icon: 'doc', ref: '__main__' }], 'main', 0),
       right: dock([{ id: 'copilot', kind: 'copilot', title: 'AI 协作者', icon: 'copilot' }], 'copilot', 340),
-      bottom: dock([], null, 200),
+      bottom: dock([{ id: 'trace', kind: 'trace', title: '执行轨迹', icon: 'trace' }], 'trace', 200),
     },
   },
   {

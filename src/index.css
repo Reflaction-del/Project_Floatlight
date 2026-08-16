@@ -3972,3 +3972,23 @@ button:active,
 .ws-item.active { background: rgba(128,128,128,.18); }
 .ws-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 .ws-del { opacity: .5; margin-left: 10px; padding: 0 4px; }
+
+/* AILog / Trace 面板化（dock 内） */
+.ai-log-docked { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+.ai-log-docked .ai-log-head { flex: none; }
+.ai-log-docked .ai-log-body { flex: 1; min-height: 0; overflow: auto; }
+.trace-docked { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
+.trace-docked .trace-modal { position: static !important; transform: none !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; box-shadow: none !important; border: none !important; border-radius: 0 !important; display: flex; flex-direction: column; }
+.trace-docked .trace-modal .trace-body { flex: 1; min-height: 0; }
+
+/* dock resize 拖把手 */
+.dock-resize-h { width: 4px; cursor: col-resize; flex: none; background: transparent; }
+.dock-resize-h:hover, .dock-resize-h.active { background: var(--accent, #4f8cff); opacity: .5; }
+.dock-resize-v { height: 4px; cursor: row-resize; flex: none; background: transparent; }
+.dock-resize-v:hover, .dock-resize-v.active { background: var(--accent, #4f8cff); opacity: .5; }
+
+/* dock-shell-col：容器横向排列（dock + resize 把手） */
+.dock-shell-col { display: flex; flex-direction: row; min-width: 0; min-height: 0; }
+.dock-main-row { align-items: stretch; }
+.dock-bottom-row { display: flex; flex-direction: column; flex: none; }
+.dock-bottom-row .dock-resize-v { flex: none; }

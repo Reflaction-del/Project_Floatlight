@@ -66,6 +66,25 @@ describe('workspaceStore Dock 布局', () => {
     expect(useWorkspaceStore.getState().docks.right.size).toBe(420);
   });
 
+  it('movePanel 支持插入位置（targetIndex 排序）', () => {
+    const st = useWorkspaceStore.getState();
+    st.addPanel('entities', 'right');   // right: copilot, entities
+    st.addPanel('outline', 'right');    // right: copilot, entities, outline
+    // 把 filetree 插到 right 的第 1 位（copilot 前）
+    st.movePanel('filetree', 'right', 0);
+    const ids = useWorkspaceStore.getState().docks.right.panels.map((p) => p.id);
+    expect(ids[0]).toBe('filetree');
+    expect(ids).toContain('outline');
+  });
+
+  it('预设 bottom 面板（writing=ailog, outline=trace）', () => {
+    const st = useWorkspaceStore.getState();
+    st.switchWorkspace('writing');
+    expect(useWorkspaceStore.getState().docks.bottom.panels.map((p) => p.id)).toContain('ailog');
+    st.switchWorkspace('outline');
+    expect(useWorkspaceStore.getState().docks.bottom.panels.map((p) => p.id)).toContain('trace');
+  });
+
   it('saveAsCustom 保存当前布局为新工作区', () => {
     const st = useWorkspaceStore.getState();
     st.movePanel('filetree', 'bottom');

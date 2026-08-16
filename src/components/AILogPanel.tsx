@@ -24,7 +24,7 @@ const LEVEL_TEXT: Record<AILogEntry['level'], string> = {
   info: 'INFO', ok: 'OK', warn: 'WARN', error: 'ERROR',
 };
 
-export function AILogPanel() {
+export function AILogPanel({ docked = false }: { docked?: boolean }) {
   const show = useUIStore((s) => s.showAILog);
   const [logs, setLogs] = useState<AILogEntry[]>(() => getAILogs());
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -43,7 +43,7 @@ export function AILogPanel() {
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [logs]);
 
-  if (!show) return null;
+  if (!show && !docked) return null;
 
   const toggleEntry = (i: number) => {
     setExpanded((prev) => {
@@ -63,6 +63,49 @@ export function AILogPanel() {
       setTimeout(() => setCopied(false), 1500);
     } catch { /* ignore */ }
   };
+
+  if (docked) {
+    return (
+      <div className="ai-log-docked">
+        <div className="ai-log-head">
+          <h3>AI 调用日志</h3>
+          <span className="tip">实时展示大模型请求阶段与原始回复</span>
+          <div className="ai-log-tools">
+            <button className="mode-btn" onClick={() => setExpanded(new Set(logs.map((_, i) => i)))}>全部展开</button>
+            <button className="mode-btn" onClick={() => setExpanded(new Set())}>收起</button>
+            <button className="mode-btn" onClick={copyAll}>{copied ? '✓ 已复制' : '复制日志'}</button>
+            <button className="mode-btn" onClick={clearAILogs}>清空</button>
+          </div>
+        </div>
+        <div
+          className="ai-log-body"
+          ref={scrollRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+          }}
+        >
+          {logs.length === 0 && <div className="placeholder-view" style={{ minHeight: 80 }}><div>暂无日志</div><div>执行一次 AI 操作后这里会显示请求明细</div></div>}
+          {logs.map((l, i) => (
+            <div key={i} className={'ai-log-entry ' + LEVEL_CLASS[l.level]}>
+              <div className="ai-log-entry-head" onClick={() => toggleEntry(i)}>
+                <span className="ai-log-time">{fmtLogTime(l.time)}</span>
+                <span className="ai-log-phase">{l.phase}</span>
+                <span className="ai-log-level">{LEVEL_TEXT[l.level]}</span>
+                <span className="ai-log-msg">{l.message}</span>
+              </div>
+              {expanded.has(i) && (l.detail || l.raw) && (
+                <div className="ai-log-detail">
+                  {l.detail && <pre>{l.detail}</pre>}
+                  {l.raw && <pre className="ai-log-raw">{l.raw}</pre>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-mask" onMouseDown={() => useUIStore.getState().setAILog(false)}>

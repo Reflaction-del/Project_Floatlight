@@ -42,7 +42,7 @@ const SOURCE_LABEL: Record<string, string> = {
   template: '模板生成', subagent: '子代理', propose: '主动提议', material: '物料',
 };
 
-export function TracePanel() {
+export function TracePanel({ docked = false }: { docked?: boolean }) {
   const show = useUIStore((s) => s.showTrace);
   const close = () => useUIStore.getState().setTrace(false);
   const worldKey = useWorldStore((s) => s.current);
@@ -111,11 +111,11 @@ export function TracePanel() {
     }
   };
 
-  if (!show) return null;
+  if (!show && !docked) return null;
 
   return (
-    <div className="modal-mask" onMouseDown={close}>
-      <div className="modal trace-modal" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={docked ? 'trace-docked' : 'modal-mask'} onMouseDown={docked ? undefined : close}>
+      <div className={'modal trace-modal' + (docked ? ' trace-modal-docked' : '')} onMouseDown={(e) => e.stopPropagation()}>
         <div className="trace-head">
           <h3>执行轨迹</h3>
           <span className="tip">对话与工具调用记录（语义层）；「AI 日志」是传输层（HTTP）</span>
