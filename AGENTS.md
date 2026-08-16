@@ -3,6 +3,17 @@
 本文件为在本仓库工作的 AI 助手提供项目背景、架构约定与工程红线。
 人工维护，请在本文件顶部追加变更，不要删除历史上下文。
 
+## 0. 自动化测试与提交门禁（2026-08-15 新增）
+
+- **测试框架**：vitest 4（`vitest.config.ts`，node 环境）。用例与源码同目录：`src/**/*.test.ts`。
+- **命令**：`npm test`（跑一次）/ `npm test:watch` / `npm run check`（test + build 全量门禁）。
+- **提交门禁**：husky 9 pre-commit（`.husky/pre-commit`）自动执行 `npm test`，**测试失败阻止 commit**。每次开发完成、提交前必须保证测试通过。
+- **测试面**（71 用例）：`utils/ai.test.ts`（AI 解析链）、`utils/consistency.test.ts`（一致性六规则）、`features/materials/bindings.test.ts`（八源绑定）、`utils/worldContext.test.ts`（分词/token 估算/引用反查）、`features/agent/agentPropose.test.ts`（主动提议）、`store/proposalTypes.test.ts`（来源标签）。**AI 相关函数改动必须保证对应测试通过**（回归保护）。
+- **双份解析实现红线**：`utils/ai.ts` 与 `utils/aiStreamWorker.ts` 的 `extractContent`/`parseMessageFromBody` 逻辑必须保持一致，改任一侧须两侧同改；`ai.test.ts` 守护 ai.ts 一侧，用例须保持通过。
+- **reasoning 兜底约定**：content 为空串 `''` 时必须回退 `reasoning_content`/`reasoning`（`??` 对空串不生效，须用「取第一个非空串」），测试覆盖此回归场景。
+- **主进程写串行化红线**：`electron-main.cjs` 所有磁盘写（fs-write-file / fs-set-save-dir / fs-export / export-pdf / material:export-* / export-batch）必须经 `enqueueWrite` 串行队列执行，禁止直接裸写——LAN 远程写与本地写共用同一入口，保证顺序与原子性。新增写路径时务必包队列。
+- 新增依赖：`vitest` / `husky` / `lint-staged`（devDependencies）。
+
 ## 1. 产品定位
 
 - **是什么**：面向小说作者、游戏策划、TRPG 主持人的**世界观管理工具**。把零散灵感整合为可用产出物（实体卡、关系图、时间线、视觉物料）。

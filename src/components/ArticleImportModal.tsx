@@ -12,6 +12,7 @@ import { useUIStore } from '../store/uiStore';
 import { useWorldviewStore } from '../store/worldviewStore';
 import { extractFromArticle, type ExtractResult } from '../features/ai/articleExtract';
 import { ENTITY_LABEL, RELATION_LABEL } from '../types';
+import { normalizeName, proposeEntityMerge } from '../features/agent/agentPropose';
 
 export function ArticleImportModal({ onClose }: { onClose: () => void }) {
   const worldview = useWorldviewStore();
@@ -20,7 +21,7 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
-  const [sent, setSent] = useState<{ added: number; dup: number; rel: number; relUnresolved: number } | null>(null);
+  const [sent, setSent] = useState<{ added: number; dup: number; rel: number; relUnresolved: number; merged: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -73,21 +74,34 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
     const existing = wd?.entities ?? [];
     const nameToId = new Map<string, string>();
     const idToName = new Map<string, string>();
-    const existingNameSet = new Set<string>();
+    // 归一化名称 → 已有实体（供 Agent 主动提议做同一性检测）
+    const existingByName = new Map<string, (typeof existing)[number]>();
     for (const e of existing) {
-      const k = e.name.trim().toLowerCase();
+      const k = normalizeName(e.name);
       nameToId.set(k, e.id);
       idToName.set(e.id, e.name);
-      existingNameSet.add(k);
+      existingByName.set(k, e);
     }
     const addProposal = useWorldStore.getState().addProposal;
     const existingIdSet = new Set(existing.map((e) => e.id));
-    let added = 0, dup = 0, rel = 0, relUnresolved = 0;
+    // 同批次内已出现过的名称（前一个已作为新实体入队）→ 直接跳过
+    const seenBatch = new Set<string>();
+    let added = 0, dup = 0, rel = 0, relUnresolved = 0, merged = 0;
     for (const ent of result.entities) {
-      const k = ent.name.trim().toLowerCase();
-      // 去重：模型已回填 existingId（与已有实体为同一事物），或名称精确命中已有实体 → 跳过
-      if ((ent.existingId && existingIdSet.has(ent.existingId)) || existingNameSet.has(k)) { dup++; continue; }
-      existingNameSet.add(k);
+      const k = normalizeName(ent.name);
+      // 去重：模型回填 existingId 或名称命中已有实体 → 不再新增；
+      // 升级为 Agent 主动提议：若抽取信息可补全已有实体，生成合并建议
+      let target: (typeof existing)[number] | undefined;
+      if (ent.existingId && existingIdSet.has(ent.existingId)) target = existing.find((e) => e.id === ent.existingId);
+      if (!target) target = existingByName.get(k);
+      if (target) {
+        dup++;
+        seenBatch.add(k);
+        if (proposeEntityMerge(target, ent)) merged++;
+        continue;
+      }
+      if (seenBatch.has(k)) { dup++; continue; }
+      seenBatch.add(k);
       const id = `en-imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}-${added}`;
       nameToId.set(k, id);
       idToName.set(id, ent.name);
@@ -108,8 +122,8 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
       added++;
     }
     for (const r of result.relations) {
-      const sId = nameToId.get(r.source.trim().toLowerCase());
-      const tId = nameToId.get(r.target.trim().toLowerCase());
+      const sId = nameToId.get(normalizeName(r.source));
+      const tId = nameToId.get(normalizeName(r.target));
       if (!sId || !tId || sId === tId) { relUnresolved++; continue; }
       addProposal({
         source: 'article',
@@ -118,7 +132,7 @@ export function ArticleImportModal({ onClose }: { onClose: () => void }) {
       });
       rel++;
     }
-    setSent({ added, dup, rel, relUnresolved });
+    setSent({ added, dup, rel, relUnresolved, merged });
     // 打开提案中心让用户逐条确认
     useUIStore.getState().setProposals(true);
     onClose();

@@ -20,6 +20,11 @@ import { EntityLibrary } from './features/entities/EntityLibrary';
 import { OnboardingModal } from './features/onboarding/OnboardingModal';
 import { FirstRunModal } from './components/FirstRunModal';
 import { StartPage } from './components/StartPage';
+import { OutlineView } from './features/outline/OutlineView';
+import { TracePanel } from './features/agent/TracePanel';
+import { SimulationView } from './features/simulation/SimulationView';
+import { initBridgeHandler } from './features/bridge/bridgeHandler';
+import { TTRPGView } from './features/ttrpg/TTRPGView';
 
 // 重型视图改为按需懒加载：首屏只加载外壳与轻量视图，物料生成器（含 qrcode /
 // canvas / svg 渲染链）、关系图（图布局）、一致性检查、分享、时间轴等仅在打开
@@ -119,6 +124,9 @@ function TabContent({ tab, mode }: { tab: TabItem; mode: EditorMode }) {
   if (tab.kind === 'timeline') return <TimelineView key={tab.ref} timelineId={tab.ref} />;
   if (tab.kind === 'entity') return <EntityEditor key={tab.ref} entityId={tab.ref} />;
   if (tab.kind === 'drafts') return <DraftsView key={tab.ref} />;
+  if (tab.kind === 'outline') return <OutlineView key={tab.ref} />;
+  if (tab.kind === 'simulation') return <SimulationView key={tab.ref} />;
+  if (tab.kind === 'ttrpg') return <TTRPGView key={tab.ref} />;
   switch (tab.ref) {
     case 'materials':
       return <MaterialForgeView />;
@@ -190,6 +198,9 @@ export default function App() {
   const copilotOpen = useUIStore((s) => s.copilotOpen);
   const firstRun = useWorldviewStore((s) => s.firstRun);
   const [titleBar, setTitleBar] = useState(appPrefs.titleBar);
+
+  // 聊天接入（Phase 3.5）：注册桥接灵感监听（主进程转发 HTTP → 渲染进程处理）
+  useEffect(() => { initBridgeHandler(); }, []);
 
   // 启动时与主进程实际窗口模式校准（自定义标题栏需 frameless）
   useEffect(() => {
@@ -285,8 +296,25 @@ export default function App() {
     };
   }, []);
 
+  // 开发模式提示：浏览器环境（无 Electron 文件系统）数据存 localStorage，
+  // 与桌面版（文件）数据不互通——启动时打版本标记，便于日后识别数据来源。
+  const [browserMode] = useState(() => {
+    if (!storage.isNative()) {
+      try {
+        localStorage.setItem('fl-storage-ver', JSON.stringify({ mode: 'browser-local', ts: Date.now() }));
+      } catch { /* ignore */ }
+      return true;
+    }
+    return false;
+  });
+
   return (
     <div className="app-root">
+      {browserMode && (
+        <div className="dev-banner">
+          开发模式 · 数据存于浏览器 localStorage（与桌面版文件数据不互通，可用「导出 / 导入」迁移）
+        </div>
+      )}
       {titleBar === 'custom' && <TitleBar />}
       <div className={'shell' + (titleBar === 'custom' ? ' with-custom-titlebar' : '')}>
         <Toolbar />
@@ -295,6 +323,7 @@ export default function App() {
         {copilotOpen && <CopilotSidebar />}
         <ProposalCenter />
         <AILogPanel />
+        <TracePanel />
         <PromptModal />
         <OnboardingModal />
         {firstRun && <FirstRunModal />}

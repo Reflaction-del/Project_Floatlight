@@ -2,7 +2,7 @@
 // 通过 contextBridge 向渲染进程暴露原生能力：插图选择、文件持久化、导入/导出对话框。
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('api', {
+const api = {
   // 插图：选择图片并以 dataURL 返回
   openImage: () => ipcRenderer.invoke('open-image'),
   // 启动时从磁盘拉取世界数据快照
@@ -53,4 +53,31 @@ contextBridge.exposeInMainWorld('api', {
   pickFolder: () => ipcRenderer.invoke('material:pick-folder'),
   // 视觉物料生成器：批量写入 PNG 序列 + manifest.json
   materialExportBatch: (folder, items) => ipcRenderer.invoke('material:export-batch', folder, items),
-});
+  // 聊天接入（Phase 3.5）：监听灵感消息 + 回执 + 桥接状态管理
+  onBridgeIncoming: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('bridge:incoming', handler);
+    try { ipcRenderer.send('bridge:registered'); } catch { /* ignore */ }
+    return () => ipcRenderer.removeListener('bridge:incoming', handler);
+  },
+  bridgeRespond: (requestId, result) => ipcRenderer.invoke('bridge:respond', requestId, result),
+  bridgeGetStatus: () => ipcRenderer.invoke('bridge:get-status'),
+  bridgeSetEnabled: (v) => ipcRenderer.invoke('bridge:set-enabled', v),
+  bridgeRotateToken: () => ipcRenderer.invoke('bridge:rotate-token'),
+
+  // —— LAN 跑团（Phase 4b）：房主 WS 服务 ——
+  lanHostStart: (opts) => ipcRenderer.invoke('lan:host-start', opts),
+  lanHostStop: () => ipcRenderer.invoke('lan:host-stop'),
+  lanHostSend: (opts) => ipcRenderer.invoke('lan:host-send', opts),
+  lanHostBroadcast: (opts) => ipcRenderer.invoke('lan:host-broadcast', opts),
+  lanGetStatus: () => ipcRenderer.invoke('lan:get-status'),
+  onLanEvent: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on('lan:event', handler);
+    return () => ipcRenderer.removeListener('lan:event', handler);
+  },
+};
+contextBridge.exposeInMainWorld('api', api);
+try {
+  ipcRenderer.send('bridge:registered', 'preload-exposed bridge:' + ['onBridgeIncoming', 'bridgeRespond', 'bridgeGetStatus', 'bridgeSetEnabled', 'bridgeRotateToken'].map((k) => k + '=' + typeof api[k]).join(' '));
+} catch (err) { ipcRenderer.send('bridge:registered', 'preload report error: ' + String(err)); }

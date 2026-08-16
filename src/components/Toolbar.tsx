@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useUIStore } from '../store/uiStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
-import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals } from './icons';
+import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice } from './icons';
 
 
 const TEMPLATES = [
@@ -25,6 +25,8 @@ export function Toolbar() {
   const toggleCopilot = useUIStore((s) => s.toggleCopilot);
   const showProposals = useUIStore((s) => s.showProposals);
   const toggleProposals = useUIStore((s) => s.toggleProposals);
+  const showTrace = useUIStore((s) => s.showTrace);
+  const toggleTrace = useUIStore((s) => s.toggleTrace);
   const pendingCount = useWorldStore((s) => (s.worldsData[s.current]?.proposals ?? []).filter((p) => p.status === 'pending').length);
   const worldview = useWorldviewStore();
   const [wmOpen, setWmOpen] = useState(false);
@@ -59,6 +61,9 @@ export function Toolbar() {
         <IconGlobe />
       </button>
       <button className={'tool-btn' + (activeModule === 'entities' ? ' mod-active' : '')} title="实体库" onClick={() => openTab({ title: '实体库', icon: 'entities', kind: 'module', ref: 'entities' })}><IconEntities /></button>
+      <button className="tool-btn" title="全局大纲（章节结构，Agent 可读写）" onClick={() => openTab({ title: '全局大纲', icon: 'outline', kind: 'outline', ref: 'outline' })}><IconOutline /></button>
+      <button className="tool-btn" title="角色模拟（多子代理推演故事）" onClick={() => openTab({ title: '角色模拟', icon: 'simulation', kind: 'simulation', ref: 'simulation' })}><IconSimulation /></button>
+      <button className="tool-btn" title="跑团（AI 主持 / 规则检定）" onClick={() => openTab({ title: '跑团', icon: 'dice', kind: 'ttrpg', ref: 'ttrpg' })}><IconDice /></button>
       <button className={'tool-btn' + (activeModule === 'relations' ? ' mod-active' : '')} title="线索板" onClick={() => openTab({ title: '线索板', icon: 'relations', kind: 'module', ref: 'relations' })}><IconRelations /></button>
       <button className={'tool-btn' + (activeModule === 'consistency' ? ' mod-active' : '')} title="一致性检查" onClick={() => openTab({ title: '一致性检查', icon: 'consistency', kind: 'module', ref: 'consistency' })}><IconConsistency /></button>
       <button className={'tool-btn' + (activeModule === 'share' ? ' mod-active' : '')} title="协作与分享" onClick={() => openTab({ title: '协作与分享', icon: 'share', kind: 'module', ref: 'share' })}><IconShare /></button>
@@ -85,6 +90,13 @@ export function Toolbar() {
       >
         <IconProposals />
         {pendingCount > 0 && <span className="prop-badge">{pendingCount}</span>}
+      </button>
+      <button
+        className={'tool-btn' + (showTrace ? ' active' : '')}
+        title="执行轨迹（对话与工具调用记录，可分叉/回放）"
+        onClick={toggleTrace}
+      >
+        <IconTrace />
       </button>
       <div className="save-group">
         <button className={'tool-btn save-btn' + (savedFlash ? ' flash' : '')} onClick={onSave} title="保存当前世界（数据已自动保存）">{savedFlash ? '✓' : <IconSave />}</button>

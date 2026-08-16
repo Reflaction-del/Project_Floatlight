@@ -73,7 +73,10 @@ async function parseStream(resp: Response) {
       if (data === '[DONE]') continue;
       try {
         const parsed = JSON.parse(data);
-        const token = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.text ?? '';
+        // 取第一个非空串：content 为 '' 时回退到 text，避免空串吞掉有效输出
+        const token =
+          [parsed.choices?.[0]?.delta?.content, parsed.choices?.[0]?.text]
+            .find((v) => typeof v === 'string' && v.length > 0) ?? '';
         if (token) ctx.postMessage({ type: 'token', token });
       } catch {
         /* 忽略不完整/非法行 */
@@ -123,8 +126,12 @@ function extractContent(text: string): { content: string; usage: any } {
       try {
         const j = JSON.parse(d);
         const delta = j?.choices?.[0]?.delta ?? {};
-        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接
-        content += delta?.content ?? delta?.reasoning_content ?? delta?.reasoning ?? j?.choices?.[0]?.text ?? '';
+        // 推理模型（R1/Qwen3-Think 等）正文在 reasoning_content / reasoning，需兜底拼接。
+        // 注意用「第一个非空串」而非 ??：content 常为 '' 空串，?? 对空串不生效会丢正文
+        const deltaText =
+          [delta?.content, delta?.reasoning_content, delta?.reasoning, j?.choices?.[0]?.text]
+            .find((v) => typeof v === 'string' && v.length > 0) ?? '';
+        content += deltaText;
         if (j?.usage) usage = j.usage;
       } catch { /* 忽略不完整/非法行 */ }
     }
@@ -133,7 +140,11 @@ function extractContent(text: string): { content: string; usage: any } {
   try {
     const j = JSON.parse(t);
     const msg = j?.choices?.[0]?.message ?? {};
-    return { content: msg?.content ?? msg?.reasoning_content ?? msg?.reasoning ?? j?.choices?.[0]?.text ?? '', usage: j?.usage ?? null };
+    // content 常为 '' 空串，?? 对空串不生效 → 取第一个非空串（reasoning 兜底）
+    const content =
+      [msg?.content, msg?.reasoning_content, msg?.reasoning, j?.choices?.[0]?.text]
+        .find((v) => typeof v === 'string' && v.length > 0) ?? '';
+    return { content, usage: j?.usage ?? null };
   } catch {
     return { content: t, usage: null };
   }

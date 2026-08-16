@@ -27,6 +27,8 @@ import {
 } from '../utils/worldContext';
 import type { WikiEntity, WikiRelation } from '../types';
 import type { WorldData } from '../store/worldStore';
+import { runAgentLoop } from '../features/agent/loop';
+import { scoreStyleDrift, type StyleDriftReport } from '../features/agent/styleProfile';
 
 marked.setOptions({
   gfm: true,
@@ -231,6 +233,30 @@ export function CopilotSidebar() {
   const [usedRefs, setUsedRefs] = useState<Retrieved[]>([]);
   const [cited, setCited] = useState<string[]>([]);
   const [showThinking, setShowThinking] = useState<Set<number>>(new Set());
+
+  // —— StyleKeeper 风格检测（Phase 5）——
+  const [showStyleKeeper, setShowStyleKeeper] = useState(false);
+  const [skSample, setSkSample] = useState('');
+  const [skTarget, setSkTarget] = useState('');
+  const [skReport, setSkReport] = useState<StyleDriftReport | null>(null);
+
+  const useDocAsSample = () => {
+    const st = useWorldStore.getState();
+    const wd = st.worldsData[st.current];
+    const activeDocId = wd?.activeDocId;
+    const doc = (wd?.docs ?? []).find((d: any) => d.id === activeDocId) ?? (wd?.docs ?? [])[0];
+    if (!doc) { alert('当前世界没有文档，请先创建文档或手动粘贴样本'); return; }
+    const text = typeof (doc as any).content === 'string' ? (doc as any).content : '';
+    setSkSample(text.replace(/<[^>]+>/g, '').slice(0, 3000));
+  };
+
+  const runStyleCheck = () => {
+    if (!skSample.trim() || !skTarget.trim()) { alert('请填写样本与目标文本'); return; }
+    setSkReport(scoreStyleDrift(skSample, skTarget));
+  };
+  // —— 协作者模式（Phase 2）：工具化多步执行 + 执行步骤展示 ——
+  const [agentMode, setAgentMode] = useState(false);
+  const [steps, setSteps] = useState<{ kind: 'tool_call' | 'tool_result' | 'reasoning' | 'context'; summary: string; detail?: string }[]>([]);
 
   // —— 引用上下文（手动指定文章/实体作为固定背景）——
   const [pinned, setPinned] = useState<{ kind: 'doc' | 'entity'; id: string }[]>([]);
@@ -448,6 +474,52 @@ export function CopilotSidebar() {
     setLoading(true);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+
+    // —— 协作者模式（Phase 2）：走 Agent Loop，模型可连续调用工具后给出最终回答 ——
+    if (agentMode) {
+      if (!world) {
+        setLoading(false);
+        setMsgs((p) => [...p, { role: 'assistant' as const, content: '（当前世界数据为空，无法启动协作者模式）' }]);
+        persistChat();
+        return;
+      }
+      setSteps([]);
+      let full = '';
+      try {
+        const res = await runAgentLoop({
+          model: currentModel,
+          world,
+          history: apiMsgs.filter((m) => m.role !== 'system'),
+          userMessage: q || '（图片消息）',
+          sessionId: 'copilot-main',
+          snapshotBudget: 800,
+          signal: abortRef.current.signal,
+          onToolCall: (name, args) => {
+            setSteps((prev) => [...prev, { kind: 'tool_call', summary: `调用工具 ${name}`, detail: JSON.stringify(args, null, 2) }]);
+          },
+          onToolResult: (name, result) => {
+            setSteps((prev) => [...prev, { kind: 'tool_result', summary: `${name} 返回 ${result.length} 字符`, detail: result.slice(0, 800) }]);
+          },
+        });
+        full = res.text;
+        setMsgs((prev) => {
+          const next = [...prev.slice(0, -1), { role: 'assistant' as const, content: full }];
+          msgsRef.current = next;
+          return next;
+        });
+      } catch (e: any) {
+        full = '';
+        if (String(e?.message ?? e).includes('aborted')) return;
+        setMsgs((p) => [...p, { role: 'assistant' as const, content: `（${e?.message ?? e}）` }]);
+      } finally {
+        setLoading(false);
+        abortRef.current = null;
+        setSteps([]);
+        persistChat();
+      }
+      return;
+    }
+
     let full = '';
     await chatStream(
       currentModel,
@@ -561,9 +633,52 @@ export function CopilotSidebar() {
         >
           约束模式
         </button>
+        <button
+          className={'co-task co-agent' + (agentMode ? ' active' : '')}
+          onClick={() => setAgentMode((v) => !v)}
+          title="协作者模式：AI 可调用工具（查大纲/扫一致性/取世界快照/检索实体）连续完成多步任务，执行过程会记录到「轨迹」"
+        >
+          协作者
+        </button>
         {taskBtn('prose', '续写')}
         {taskBtn('idea', '灵感')}
         {taskBtn('lore', '考据')}
+      </div>
+
+      <div className="co-stylekeeper">
+        <button className={'co-task' + (showStyleKeeper ? ' active' : '')} onClick={() => setShowStyleKeeper((v) => !v)} title="StyleKeeper：本地统计风格指纹，检测长文口吻漂移（不调用 AI）">
+          风格检测
+        </button>
+        {showStyleKeeper && (
+          <div className="co-sk-panel">
+            <div className="co-sk-row">
+              <span className="co-row-label">样本（风格基准）</span>
+              <button className="co-sk-btn" onClick={useDocAsSample} title="用当前文档正文作样本">用当前文档</button>
+            </div>
+            <textarea className="co-sk-text" value={skSample} onChange={(e) => setSkSample(e.target.value)} placeholder="粘贴样本文本（≥100 字更准）" rows={3} />
+            <span className="co-row-label">目标文本（待检测）</span>
+            <textarea className="co-sk-text" value={skTarget} onChange={(e) => setSkTarget(e.target.value)} placeholder="粘贴 AI 续写片段 / 他人代笔段落" rows={3} />
+            <button className="mode-btn active" onClick={runStyleCheck} style={{ fontSize: 12 }} disabled={!skSample.trim() || !skTarget.trim()}>检测漂移</button>
+            {skReport && (
+              <div className="co-sk-report">
+                <div className={'co-sk-verdict st-' + skReport.verdict}>
+                  {skReport.verdict === 'close' ? '风格一致' : skReport.verdict === 'moderate' ? '轻微漂移' : '明显漂移'}
+                  <span className="tip"> 漂移度 {(skReport.score * 100).toFixed(0)}%</span>
+                </div>
+                <div className="co-sk-items">
+                  {skReport.items.map((it) => (
+                    <div key={it.key} className={'co-sk-item' + (it.deviated ? ' dev' : '')}>
+                      <span>{it.label}</span>
+                      <span className="tip">{it.sample.toFixed(2)} → {it.target.toFixed(2)}</span>
+                      {it.deviated && <b className="co-sk-badge">偏离</b>}
+                    </div>
+                  ))}
+                </div>
+                <p className="tip" style={{ fontSize: 11 }}>提示：把样本与目标都贴近同一题材再对比，指标偏差 ≥35% 标记为偏离。</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {constraintMode && entities.length > 0 && (
@@ -670,8 +785,20 @@ export function CopilotSidebar() {
         ))}
         {loading && (
           <div className="co-status-row">
-            <span className="tip">AI 响应中…</span>
+            <span className="tip">{agentMode ? '协作者执行中…' : 'AI 响应中…'}</span>
             <button className="co-stop-btn" onClick={stop} title="终止当前响应">停止</button>
+          </div>
+        )}
+        {/* 协作者模式：实时展示工具执行步骤（与「轨迹」面板同源采集） */}
+        {loading && agentMode && steps.length > 0 && (
+          <div className="co-steps">
+            <div className="co-row-label">执行步骤：</div>
+            {steps.map((s, i) => (
+              <div key={i} className={'co-step cs-' + s.kind}>
+                <span className="co-step-sum">{s.summary}</span>
+                {s.detail && <pre className="co-step-detail">{s.detail}</pre>}
+              </div>
+            ))}
           </div>
         )}
         {cited.length > 0 && (

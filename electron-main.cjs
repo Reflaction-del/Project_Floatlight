@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, session } = require('electron');
 
 const DIST = path.join(app.getAppPath(), 'dist');
@@ -88,6 +89,191 @@ function startServer() {
   });
 }
 
+// —— 聊天接入桥接服务（Phase 3.5）——
+// 本地 HTTP API（仅回环 127.0.0.1 + Bearer 令牌 + 限流），供外部机器人框架
+// （AstrBot 等）转发聊天消息：POST /api/v1/inspiration。平台无关，适配在外部。
+// 令牌持久化到 userData/fl-bridge.json（仅本机），可轮换。enabled=false 时返回 503。
+const BRIDGE_CONFIG_FILE = path.join(app.getPath('userData'), 'fl-bridge.json');
+let bridgeConfig = { enabled: true, token: '', port: 0 };
+const bridgePending = new Map(); // requestId -> resolve
+const BRIDGE_RATE_WINDOW_MS = 60 * 1000;
+const BRIDGE_RATE_LIMIT = 120;
+let bridgeHits = [];
+
+function loadBridgeConfig() {
+  try {
+    const c = JSON.parse(fs.readFileSync(BRIDGE_CONFIG_FILE, 'utf8'));
+    if (c && typeof c.token === 'string' && c.token.length >= 16) {
+      bridgeConfig = { enabled: c.enabled !== false, token: c.token, port: c.port || 0 };
+      return;
+    }
+  } catch { /* 首启生成 */ }
+  bridgeConfig.token = crypto.randomBytes(24).toString('hex');
+  saveBridgeConfig();
+}
+function saveBridgeConfig() {
+  try { fs.writeFileSync(BRIDGE_CONFIG_FILE, JSON.stringify(bridgeConfig)); } catch { /* ignore */ }
+}
+function rotateBridgeToken() {
+  bridgeConfig.token = crypto.randomBytes(24).toString('hex');
+  saveBridgeConfig();
+  return bridgeConfig.token;
+}
+function bridgeRateLimited() {
+  const now = Date.now();
+  bridgeHits = bridgeHits.filter((t) => now - t < BRIDGE_RATE_WINDOW_MS);
+  if (bridgeHits.length >= BRIDGE_RATE_LIMIT) return true;
+  bridgeHits.push(now);
+  return false;
+}
+// ============================================================
+// LAN 跑团 WS 服务（Phase 4b）
+// ------------------------------------------------------------
+// 房主实例启动的局域网 WebSocket 服务（绑定 0.0.0.0，仅局域网可达）：
+// - 握手校验 ?room=房间码&token=令牌，防陌生连接
+// - 主进程只做帧传输与转发（薄层）：消息路由/业务在房主渲染进程
+// - 连接事件经 lan:event 转发渲染进程；渲染进程经 lan:host-send/broadcast 下发
+// - 远程玩家安装应用后输 地址+房间码+令牌 加入，无需账号
+// - 服务实现抽离到 lan-server.cjs（无 Electron 依赖，vitest 集成测试覆盖）
+// ============================================================
+const lanServerMod = require('./src/features/ttrpg/lan/lan-server.cjs');
+let lanHost = null; // createLanServer 返回的句柄
+
+function makeLanRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去易混淆 I/O/0/1
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function getLanIPs() {
+  const out = [];
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const it of (ifaces[name] || [])) {
+      if (it.family === 'IPv4' && !it.internal) out.push(it.address);
+    }
+  }
+  return out;
+}
+
+function lanNotify(win, event, data) {
+  if (win && !win.isDestroyed()) win.webContents.send('lan:event', Object.assign({ event }, data));
+}
+
+function stopLanHost() {
+  if (lanHost) {
+    try { lanHost.stop(); } catch { /* ignore */ }
+    lanHost = null;
+  }
+}
+
+function startLanHost(win, roomCode, token) {
+  stopLanHost();
+  lanHost = lanServerMod.createLanServer({
+    roomCode,
+    token,
+    onEvent: (ev) => lanNotify(win, ev.event, ev),
+  });
+  return lanHost;
+}
+
+// —— LAN IPC ——
+ipcMain.handle('lan:host-start', async (_e, opts) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  const roomCode = (opts && opts.roomCode) || makeLanRoomCode();
+  const token = (opts && opts.token) || crypto.randomBytes(12).toString('hex');
+  const host = startLanHost(win, roomCode, token);
+  await host.ready();
+  return { ok: true, port: host.port(), roomCode, token, ips: getLanIPs() };
+});
+ipcMain.handle('lan:host-stop', () => { stopLanHost(); return { ok: true }; });
+ipcMain.handle('lan:host-send', (_e, opts) => {
+  if (!lanHost || !opts || typeof opts.name !== 'string') return { ok: false, error: 'no room' };
+  return lanHost.sendTo(opts.name, opts.payload) ? { ok: true } : { ok: false, error: 'peer not found' };
+});
+ipcMain.handle('lan:host-broadcast', (_e, opts) => {
+  if (!lanHost) return { ok: false, error: 'no room' };
+  const count = lanHost.broadcast(opts && opts.payload, opts && opts.except);
+  return { ok: true, count };
+});
+ipcMain.handle('lan:get-status', () => ({
+  ok: true,
+  hosting: !!lanHost,
+  port: lanHost ? lanHost.port() : 0,
+  roomCode: '',
+  clients: lanHost ? lanHost.clientNames() : [],
+}));
+
+function startBridgeServer() {
+  const server = http.createServer((req, res) => {
+    const sendJson = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(obj));
+    };
+    if (req.method !== 'POST' || (req.url || '').split('?')[0] !== '/api/v1/inspiration') {
+      return sendJson(404, { ok: false, error: 'not found' });
+    }
+    if (!bridgeConfig.enabled) return sendJson(503, { ok: false, error: 'bridge disabled' });
+    const auth = req.headers.authorization || '';
+    const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!bridgeConfig.token || !safeEqual(provided, bridgeConfig.token)) {
+      return sendJson(401, { ok: false, error: 'unauthorized' });
+    }
+    if (bridgeRateLimited()) return sendJson(429, { ok: false, error: 'rate limited' });
+
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 65536) req.destroy(); });
+    req.on('end', async () => {
+      let payload;
+      try { payload = JSON.parse(body || '{}'); } catch { return sendJson(400, { ok: false, error: 'bad json' }); }
+      const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+      if (!text) return sendJson(400, { ok: false, error: 'empty text' });
+      const clean = {
+        platform: String(payload.platform || 'webhook'),
+        chatId: String(payload.chatId || ''),
+        userId: String(payload.userId || ''),
+        nickname: String(payload.nickname || ''),
+        text,
+        ts: typeof payload.ts === 'number' ? payload.ts : Date.now(),
+      };
+      const requestId = crypto.randomBytes(12).toString('hex');
+      const win = BrowserWindow.getAllWindows()[0];
+      if (!win) return sendJson(500, { ok: false, error: 'no window' });
+      console.log('[bridge] forwarding request', requestId);
+      // 转发渲染进程处理（有 AI 配置与草稿箱），30s 超时兜底
+      const result = await new Promise((resolve) => {
+        bridgePending.set(requestId, resolve);
+        win.webContents.send('bridge:incoming', { requestId, payload: clean });
+        setTimeout(() => {
+          if (bridgePending.has(requestId)) {
+            bridgePending.delete(requestId);
+            resolve({ ok: false, error: 'renderer timeout' });
+          }
+        }, 30000);
+      });
+      sendJson(200, result);
+    });
+  });
+  server.listen(0, '127.0.0.1', () => {
+    bridgeConfig.port = server.address().port;
+    saveBridgeConfig();
+  });
+}
+
+ipcMain.handle('bridge:respond', (e, requestId, result) => {
+  const resolve = bridgePending.get(requestId);
+  if (resolve) { bridgePending.delete(requestId); resolve(result || { ok: false, error: 'no result' }); }
+});
+ipcMain.handle('bridge:get-status', () => ({
+  enabled: bridgeConfig.enabled,
+  port: bridgeConfig.port,
+  token: bridgeConfig.token,
+}));
+ipcMain.handle('bridge:set-enabled', (e, v) => { bridgeConfig.enabled = !!v; saveBridgeConfig(); return bridgeConfig.enabled; });
+ipcMain.handle('bridge:rotate-token', () => rotateBridgeToken());
+ipcMain.on('bridge:registered', (_e, info) => { console.log('[bridge] renderer:', info || 'listener registered'); });
+
 // 存储目录配置（位于用户数据目录下），可被设置界面覆盖
 const SAVE_CONFIG = path.join(app.getPath('userData'), 'fl-savedir.json');
 
@@ -148,6 +334,18 @@ function atomicWriteFile(targetPath, content) {
   fs.renameSync(tmpPath, targetPath);
 }
 
+// —— 磁盘写串行化 ——
+// 渲染进程多个 store 可能并发发起写盘（世界数据 / AI 配置 / 导出等），
+// LAN 跑团上线后远程实例的写也会汇入同一入口。所有磁盘写统一经本队列
+// 串行执行：前一任务完成才执行下一个，保证顺序与原子性，避免写交错 / 半写。
+// 用法：把「真正落盘的同步/异步操作」包进 enqueueWrite，返回值透传给 IPC 调用方。
+let writeQueue = Promise.resolve();
+function enqueueWrite(fn) {
+  const run = writeQueue.then(fn, fn); // 前一任务失败不阻断后续
+  writeQueue = run.catch(() => {});
+  return run;
+}
+
 function readJson(f) {
   const p = path.join(getSaveDir(), f);
   let raw = null;
@@ -186,10 +384,10 @@ ipcMain.handle('boot', () => {
   };
 });
 
-// 渲染进程写入存储目录下的文件（原子写，见 atomicWriteFile）
+// 渲染进程写入存储目录下的文件（原子写，见 atomicWriteFile；经串行队列防并发交错）
 ipcMain.handle('fs-write-file', (e, name, content) => {
   const dir = ensureDir(getSaveDir());
-  atomicWriteFile(path.join(dir, safeName(name)), content);
+  return enqueueWrite(() => atomicWriteFile(path.join(dir, safeName(name)), content));
 });
 
 // 渲染进程读取存储目录下的文件（用于加载语义索引等侧车文件）
@@ -233,10 +431,12 @@ function migrateSaveDir(oldDir, newDir) {
 ipcMain.handle('fs-set-save-dir', (e, dir) => {
   const oldDir = getSaveDir();
   const d = ensureDir(dir);
-  // 先迁移，再保存配置：保证新目录立即包含完整历史数据
-  migrateSaveDir(oldDir, d);
-  try { fs.writeFileSync(SAVE_CONFIG, JSON.stringify({ dir: d })); } catch { /* ignore */ }
-  return d;
+  // 先迁移，再保存配置：保证新目录立即包含完整历史数据（迁移+配置写入经串行队列）
+  return enqueueWrite(() => {
+    migrateSaveDir(oldDir, d);
+    try { fs.writeFileSync(SAVE_CONFIG, JSON.stringify({ dir: d })); } catch { /* ignore */ }
+    return d;
+  });
 });
 
 // 导入：系统文件选择器
@@ -262,7 +462,7 @@ ipcMain.handle('fs-export', async (e, defaultName, content) => {
     filters: [{ name: 'JSON', extensions: ['json'] }],
   });
   if (canceled || !filePath) return false;
-  try { fs.writeFileSync(filePath, String(content)); return true; } catch { return false; }
+  return enqueueWrite(() => { try { fs.writeFileSync(filePath, String(content)); return true; } catch { return false; } });
 });
 
 // 唤起系统文件选择器，读取图片并以 dataURL 返回
@@ -332,8 +532,7 @@ ipcMain.handle('export-pdf', async (e, htmlContent, title) => {
       filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, pdfData);
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, pdfData); return true; });
   } catch (err) {
     console.error('[export-pdf]', err);
     return false;
@@ -357,7 +556,8 @@ function openHidden(w, h, scale) {
 function loadAndSettle(win, html) {
   return new Promise((resolve, reject) => {
     win.webContents.once('did-fail-load', (_e, _code, desc) => reject(new Error(desc || 'load failed')));
-    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => {
+    
+win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html)).then(() => {
       // 字体 / 内联图片解码需要一点延迟，350ms 足够离线场景
       setTimeout(resolve, 350);
     }).catch(reject);
@@ -385,8 +585,7 @@ ipcMain.handle('material:export-preview', async (_e, rect, defaultName = 'previe
       filters: [{ name: 'PNG 图片', extensions: ['png'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, image.toPNG());
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, image.toPNG()); return true; });
   } catch (err) {
     console.error('[material:export-preview]', err);
     return false;
@@ -424,8 +623,7 @@ ipcMain.handle('material:export-png', async (_e, html, opts) => {
       filters: [{ name: 'PNG 图片', extensions: ['png'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, png.toPNG());
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, png.toPNG()); return true; });
   } catch (err) {
     console.error('[material:export-png]', err);
     return false;
@@ -453,8 +651,7 @@ ipcMain.handle('material:export-pdf', async (_e, html, opts) => {
       filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return false;
-    fs.writeFileSync(filePath, buf);
-    return true;
+    return enqueueWrite(() => { fs.writeFileSync(filePath, buf); return true; });
   } catch (err) {
     console.error('[material:export-pdf]', err);
     return false;
@@ -471,34 +668,36 @@ ipcMain.handle('material:pick-folder', async () => {
   if (canceled || !filePaths.length) return null;
   return filePaths[0];
 });
-// 批量写入 PNG 序列 + manifest.json（零新依赖，直接落盘）
-ipcMain.handle('material:export-batch', async (_e, folder, items) => {
-  try {
-    if (!folder || !Array.isArray(items)) return { written: 0, folder: null };
-    if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
-    let written = 0;
-    for (const it of items) {
-      const m = /^data:image\/png;base64,(.+)$/.exec(it.dataUrl || '');
-      if (!m) continue;
-      const name = safeName(it.filename || `item-${written + 1}`) + '.png';
-      fs.writeFileSync(path.join(folder, name), Buffer.from(m[1], 'base64'));
-      written++;
+// 批量写入 PNG 序列 + manifest.json（零新依赖，直接落盘；整体作为一个串行写任务）
+ipcMain.handle('material:export-batch', (_e, folder, items) => {
+  return enqueueWrite(() => {
+    try {
+      if (!folder || !Array.isArray(items)) return { written: 0, folder: null };
+      if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
+      let written = 0;
+      for (const it of items) {
+        const m = /^data:image\/png;base64,(.+)$/.exec(it.dataUrl || '');
+        if (!m) continue;
+        const name = safeName(it.filename || `item-${written + 1}`) + '.png';
+        fs.writeFileSync(path.join(folder, name), Buffer.from(m[1], 'base64'));
+        written++;
+      }
+      const manifest = {
+        generatedAt: new Date().toISOString(),
+        count: written,
+        items: items.map((it) => ({
+          filename: safeName(it.filename || '') + '.png',
+          entityId: it.entityId ?? '',
+          entityName: it.entityName ?? '',
+        })),
+      };
+      fs.writeFileSync(path.join(folder, 'manifest.json'), JSON.stringify(manifest, null, 2));
+      return { written, folder };
+    } catch (err) {
+      console.error('[material:export-batch]', err);
+      return { written: 0, folder: null, error: String(err) };
     }
-    const manifest = {
-      generatedAt: new Date().toISOString(),
-      count: written,
-      items: items.map((it) => ({
-        filename: safeName(it.filename || '') + '.png',
-        entityId: it.entityId ?? '',
-        entityName: it.entityName ?? '',
-      })),
-    };
-    fs.writeFileSync(path.join(folder, 'manifest.json'), JSON.stringify(manifest, null, 2));
-    return { written, folder };
-  } catch (err) {
-    console.error('[material:export-batch]', err);
-    return { written: 0, folder: null, error: String(err) };
-  }
+  });
 });
 
 // 动态更新窗口标题栏背景色（跟随主题切换）
@@ -670,6 +869,18 @@ async function createWindow() {
       preload: PRELOAD,
     },
   });
+  win.webContents.on('did-finish-load', () => console.log('[main] renderer did-finish-load'));
+  win.webContents.on('did-fail-load', (_e, code, desc) => console.log('[main] renderer did-fail-load', code, desc));
+  win.webContents.on('render-process-gone', (_e, details) => console.log('[main] renderer gone', JSON.stringify(details)));
+  // 渲染进程 console → 主进程 stdout（调试桥接/渲染错误；Electron 31 为对象签名）
+  // 兼容两种签名：Electron 31 旧 (level, message) / 新 (details 对象)
+  win.webContents.on('console-message', (_e, a, b) => {
+    const level = a && typeof a === 'object' ? a.level : a;
+    const message = a && typeof a === 'object' ? a.message : b;
+    if ((typeof message === 'string' && message.includes('[bridge]')) || level >= 2) {
+      console.log('[renderer:' + (level === 3 ? 'error' : 'log') + ']', message);
+    }
+  });
   win.loadURL(`http://127.0.0.1:${port}/`);
 
   // —— 安全加固：窗口打开与导航拦截 ——
@@ -738,7 +949,9 @@ app.whenReady().then(async () => {
   // 过滤器匹配所有 127.0.0.1 端口，监听器内再按「目标端口 == 本项目服务器」精确判断，
   // 确保令牌不会附加到用户自配的其它本地服务（如 Ollama 127.0.0.1:11434）。
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['http://127.0.0.1:*/'] },
+    // 注意：路径必须是 /* 才能覆盖子资源（/assets/*.js 等）；原 / 只匹配根路径，
+    // 导致子资源 403、渲染进程白屏（真实 bug，2026-08-15 修复）
+    { urls: ['http://127.0.0.1:*/*'] },
     (details, callback) => {
       try {
         const u = new URL(details.url);
@@ -753,6 +966,8 @@ app.whenReady().then(async () => {
   );
   winPrefs = readWinPrefs();
   Menu.setApplicationMenu(buildMenu());
+  loadBridgeConfig();
+  startBridgeServer();
   await createWindow();
 });
 

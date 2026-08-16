@@ -59,3 +59,6 @@ vite.config.ts.timestamp-*
 *.deb
 *.rpm
 *.snap
+
+# Android release signing (local only, contains keystore password)
+android/keystore.properties

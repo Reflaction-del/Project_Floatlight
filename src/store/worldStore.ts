@@ -4,6 +4,13 @@ import { createDefaultStyleToken } from '../features/materials/types';
 import type { MaterialStyle, GeneratedMaterial, MaterialTemplate } from '../features/materials/types';
 import { GUIDE_DOCS } from '../seed/guide';
 import type { Proposal, ChatSession } from './proposalTypes';
+import type { OutlineNode } from '../features/outline/types';
+import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
+import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
+import type { BridgeEntry } from '../features/bridge/types';
+import type { Rulebook, TTRPGSession, SessionTurn } from '../features/ttrpg/types';
+import type { WorldTemplateFile } from '../features/market/worldTemplate';
+import { newSimulation, pushEvent } from '../features/simulation/simOps';
 import type {
   DocFile,
   WikiElement,
@@ -55,8 +62,24 @@ export interface WorldData {
   entities: WikiEntity[];
   /** M2 实体关系 */
   relations: WikiRelation[];
-  /** 草稿箱（手动快记） */
-  drafts: { id: string; title: string; content: string; createdAt: number }[];
+  /** 草稿箱（手动快记 / 聊天接入灵感） */
+  drafts: {
+    id: string;
+    title: string;
+    content: string;
+    createdAt: number;
+    /** 来源标记（聊天平台灵感，可选） */
+    source?: { platform: string; userId: string; nickname: string; ts: number };
+    tags?: string[];
+    /** 推荐挂载的大纲节点（仅元数据，不自动挂载） */
+    outlineHint?: { id: string; title: string };
+  }[];
+  /** 聊天接入日志（Phase 3.5）：灵感消息留痕 */
+  bridgeLog: BridgeEntry[];
+  /** 用户规则书（Phase 4a）：.fugurule 导入/新建；内置骨架为代码常量不持久化 */
+  rulebooks: Rulebook[];
+  /** 跑团会话（Phase 4a） */
+  ttrpgSessions: TTRPGSession[];
   activeDocId: string;
   activeTimelineId: string;
   /** M6 线索板设置 */
@@ -65,6 +88,10 @@ export interface WorldData {
   proposals: Proposal[];
   /** AI 对话记录（Phase 0）：每世界一份持久化会话 */
   chats: ChatSession[];
+  /** 全局大纲（Phase 1）：树形结构，parentId 递归任意深度 */
+  outline: OutlineNode[];
+  /** 角色模拟（Phase 3）：多子代理沙盘/导演式会话 */
+  simulations: Simulation[];
   /** 演示种子版本号（仅演示世界带此字段）；< CURRENT_SEED_VERSION 时启动时强制升级到最新演示 */
   seedVersion?: number;
 }
@@ -123,8 +150,20 @@ interface WorldState {
   setClueBoardBackgroundScale: (scale: number) => void;
   /* ——— 草稿箱 ——— */
   addDraft: (title: string, content: string) => void;
+  /** 扩展添加（聊天接入灵感：带来源标记/标签/大纲推荐） */
+  addDraftEx: (input: { title: string; content: string; source?: { platform: string; userId: string; nickname: string; ts: number }; tags?: string[]; outlineHint?: { id: string; title: string } }) => string;
   updateDraft: (id: string, title: string, content: string) => void;
   deleteDraft: (id: string) => void;
+  /* ——— 聊天接入日志（Phase 3.5） ——— */
+  addBridgeEntry: (entry: BridgeEntry) => void;
+  /* ——— 跑团（Phase 4a） ——— */
+  addRulebook: (rb: Rulebook) => string;
+  updateRulebook: (id: string, patch: Partial<Rulebook>) => void;
+  deleteRulebook: (id: string) => void;
+  addTTRPGSession: (input: { mode: TTRPGSession['mode']; title: string; rulebookId: string; gmName?: string; players: TTRPGSession['players'] }) => string;
+  updateTTRPGSession: (id: string, patch: Partial<TTRPGSession>) => void;
+  deleteTTRPGSession: (id: string) => void;
+  appendTTRPGTurn: (id: string, turn: Omit<SessionTurn, 'id' | 'ts'>) => void;
   /* ——— 世界管理 ——— */
   /* —— 视觉物料生成器（P0-1d） —— */
   addStyle: (input: Omit<MaterialStyle, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -138,6 +177,8 @@ interface WorldState {
   updateTemplate: (id: string, patch: Partial<MaterialTemplate>) => void;
   deleteTemplate: (id: string) => void;
   addWorld: (name: string, template?: 'empty' | 'novel' | 'script') => void;
+  /** 插件市场：从 .fuguworld 世界模板创建新世界（返回 worldKey，失败返回 null） */
+  addWorldFromTemplate: (template: WorldTemplateFile, preferName?: string) => string | null;
   removeWorld: (name: string, nextName?: string) => void;
   renameWorld: (oldName: string, newName: string) => void;
   switchWorld: (name: string, onPrompt?: (current: string) => Promise<'save' | 'discard' | 'cancel'>) => Promise<boolean>;
@@ -154,6 +195,28 @@ interface WorldState {
   /* ——— AI 对话持久化（Phase 0） ——— */
   upsertChat: (worldKey: string, chat: ChatSession) => void;
   getChat: (worldKey: string, id: string) => ChatSession | undefined;
+  /* ——— 全局大纲（Phase 1） ——— */
+  addOutlineNode: (input: {
+    title: string;
+    kind: OutlineNode['kind'];
+    parentId?: string | null;
+    summary?: string;
+    docId?: string;
+    timelineId?: string;
+    status?: OutlineNode['status'];
+  }) => string;
+  updateOutlineNode: (id: string, patch: Partial<OutlineNode>) => void;
+  deleteOutlineNode: (id: string) => void;
+  /** 移动节点到新父级/位置；非法（成环）返回 false */
+  moveOutlineNode: (id: string, newParentId: string | null, newOrder: number) => boolean;
+  /* ——— 角色模拟（Phase 3） ——— */
+  addSimulation: (input: { mode: Simulation['mode']; title: string; scenario: string; actors: SubAgent[]; pacing?: Simulation['pacing']; autoSteps?: number; timeScale?: Simulation['timeScale']; stepBudget?: number }) => string;
+  updateSimulation: (id: string, patch: Partial<Simulation>) => void;
+  deleteSimulation: (id: string) => void;
+  /** 追加一条模拟事件（内部按 stepBudget 自动结束） */
+  pushSimEvent: (simId: string, ev: { actor: string; kind: SimEventKind; content: string }) => void;
+  /** 更新某个角色实例（人格词/模型/策略/记忆槽） */
+  updateSimulationActor: (simId: string, actorId: string, patch: Partial<SubAgent>) => void;
   deleteChat: (worldKey: string, id: string) => void;
 }
 
@@ -174,6 +237,11 @@ function emptyTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
+    simulations: [],
+    bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 function novelTemplate(): WorldData {
@@ -202,6 +270,11 @@ function novelTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
+    simulations: [],
+    bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 function scriptTemplate(): WorldData {
@@ -223,6 +296,11 @@ function scriptTemplate(): WorldData {
     clueBoard: {},
     proposals: [],
     chats: [],
+    outline: [],
+    simulations: [],
+    bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
   };
 }
 
@@ -914,6 +992,11 @@ export const DEFAULT_DATA: WorldData = {
   ],
   proposals: [DEMO_PROPOSAL],
   chats: [],
+  outline: [],
+    simulations: [],
+    bridgeLog: [],
+    rulebooks: [],
+    ttrpgSessions: [],
 };
 
 let docSeq = 100;
@@ -1227,6 +1310,46 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       });
     },
     addDraft: (title, content) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const id = `df-${Date.now()}-${Math.random().toString(36).slice(2,6)}`; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: [...(wd.drafts ?? []), { id, title, content, createdAt: Date.now() }] } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    addDraftEx: (input) => {
+      const id = `df-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: [...(wd.drafts ?? []), { id, title: input.title, content: input.content, createdAt: Date.now(), source: input.source, tags: input.tags, outlineHint: input.outlineHint }] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    addBridgeEntry: (entry) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, bridgeLog: [...(wd.bridgeLog ?? []), entry].slice(-100) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    /* ——— 跑团（Phase 4a） ——— */
+    addRulebook: (rb) => {
+      const now = Date.now();
+      const id = rb.id || `rb-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: [...(wd.rulebooks ?? []), { ...rb, id, createdAt: now, updatedAt: now }] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateRulebook: (id, patch) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: (wd.rulebooks ?? []).map((r) => r.id === id ? { ...r, ...patch, id, updatedAt: Date.now() } : r) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    deleteRulebook: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, rulebooks: (wd.rulebooks ?? []).filter((r) => r.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    addTTRPGSession: (input) => {
+      const now = Date.now();
+      const id = `tt-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      const session: TTRPGSession = {
+        id, mode: input.mode, title: input.title || '未命名跑团', rulebookId: input.rulebookId,
+        gmName: input.gmName || 'GM', players: input.players ?? [], log: [], state: {}, createdAt: now, updatedAt: now,
+      };
+      set((s) => {
+        const w = s.current; const wd = s.worldsData[w]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: [...(wd.ttrpgSessions ?? []), session] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateTTRPGSession: (id, patch) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).map((t) => t.id === id ? { ...t, ...patch, id, updatedAt: Date.now() } : t) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    deleteTTRPGSession: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).filter((t) => t.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
+    appendTTRPGTurn: (id, turn) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, ttrpgSessions: (wd.ttrpgSessions ?? []).map((t) => t.id === id ? { ...t, log: [...t.log, { ...turn, id: `tn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, ts: Date.now() }], updatedAt: Date.now() } : t) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     updateDraft: (id, title, content) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).map((d) => d.id === id ? { ...d, title, content } : d) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     deleteDraft: (id) => { set((s) => { const w = s.current; const wd = s.worldsData[w]; if (!wd) return s; const next = { ...s, worldsData: { ...s.worldsData, [w]: { ...wd, drafts: (wd.drafts ?? []).filter((d) => d.id !== id) } }, dirty: true }; saveAllData(next.worldsData); return next; }); },
     /* —— 世界管理 —— */
@@ -1234,6 +1357,29 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
       const tmpl = TEMPLATES[template] || TEMPLATES.empty;
       const wd = tmpl();
       set((s) => { const next = { ...s, worldsData: { ...s.worldsData, [name]: wd }, dirty: true }; saveAllData(next.worldsData); return next; });
+    },
+    addWorldFromTemplate: (template, preferName) => {
+      const base = TEMPLATES.empty();
+      const picked: any = {};
+      const keys = ['entities', 'relations', 'timelines', 'outline', 'docs', 'folders', 'styles', 'templates', 'materials', 'rulebooks'] as const;
+      for (const k of keys) {
+        const v = (template.world as any)?.[k];
+        if (Array.isArray(v)) picked[k] = v;
+      }
+      const wd = { ...base, ...picked };
+      // worldKey：模板名或优先名，冲突加后缀
+      const raw = (preferName || template.name || '新世界').trim();
+      let key = raw;
+      const st = get();
+      let i = 2;
+      while (st.worldsData[key]) key = `${raw} ${i++}`;
+      set((s) => {
+        const next = { ...s, worldsData: { ...s.worldsData, [key]: wd }, current: key, dirty: true };
+        saveAllData(next.worldsData);
+        storage.saveCurrent(key);
+        return next;
+      });
+      return key;
     },
     removeWorld: (name, nextName) => {
       set((s) => {
@@ -1363,6 +1509,108 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
         saveAllData(next.worldsData); return next;
       });
     },
+    /* ——— 全局大纲（Phase 1） ——— */
+    addOutlineNode: (input) => {
+      const now = Date.now();
+      const id = `ol-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = wd.outline ?? [];
+        const parentId = input.parentId ?? null;
+        const node: OutlineNode = {
+          id,
+          title: input.title || '未命名节点',
+          kind: input.kind,
+          parentId,
+          order: nextOrder(outline, parentId),
+          status: input.status ?? 'todo',
+          summary: input.summary,
+          docId: input.docId,
+          timelineId: input.timelineId,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline: [...outline, node] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return id;
+    },
+    updateOutlineNode: (id, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = (wd.outline ?? []).map((n) => (n.id === id ? { ...n, ...patch, id, updatedAt: Date.now() } : n));
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    deleteOutlineNode: (id) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const outline = removeSubtree(wd.outline ?? [], id);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    moveOutlineNode: (id, newParentId, newOrder) => {
+      const s = get();
+      const wd = s.worldsData[s.current]; if (!wd) return false;
+      const moved = moveOutlineNode(wd.outline ?? [], id, newParentId, newOrder);
+      if (!moved) return false;
+      set((st) => {
+        const w = st.worldsData[st.current]; if (!w) return st;
+        const next = { ...st, worldsData: { ...st.worldsData, [st.current]: { ...w, outline: moved } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return true;
+    },
+    /* ——— 角色模拟（Phase 3） ——— */
+    addSimulation: (input) => {
+      const sim = newSimulation(input);
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations: [...(wd.simulations ?? []), sim] } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return sim.id;
+    },
+    updateSimulation: (id, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => sim.id === id ? { ...sim, ...patch, id, updatedAt: Date.now() } : sim);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    deleteSimulation: (id) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).filter((sim) => sim.id !== id);
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    pushSimEvent: (simId, ev) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => {
+          if (sim.id !== simId) return sim;
+          return pushEvent(sim, ev);
+        });
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
+    updateSimulationActor: (simId, actorId, patch) => {
+      set((s) => {
+        const wd = s.worldsData[s.current]; if (!wd) return s;
+        const simulations = (wd.simulations ?? []).map((sim) => {
+          if (sim.id !== simId) return sim;
+          return { ...sim, actors: sim.actors.map((a) => (a.id === actorId ? { ...a, ...patch, id: actorId } : a)) };
+        });
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, simulations } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+    },
   } as WorldState;
 });
 
@@ -1381,6 +1629,14 @@ function dispatchProposal(p: Proposal) {
       break;
     case 'addTemplate':
       ws.addTemplate(p.op.template);
+      break;
+    case 'addTimelineEvent':
+      ws.addTimelineEvent(p.op.timelineId, {
+        label: p.op.event.label,
+        year: p.op.event.year,
+        note: p.op.event.note,
+        impact: p.op.event.impact,
+      });
       break;
   }
 }

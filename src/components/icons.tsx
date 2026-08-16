@@ -205,6 +205,54 @@ export function IconProposals(p: IconProps) {
   );
 }
 
+/* 全局大纲 — 树形层级（Phase 1） */
+export function IconOutline(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 5h16" />
+      <path d="M4 12h10" />
+      <path d="M4 19h6" />
+      <circle cx="19" cy="12" r="1.6" />
+      <circle cx="15" cy="19" r="1.6" />
+    </Svg>
+  );
+}
+
+/* 执行轨迹 — 波形线（Phase 1.5） */
+export function IconTrace(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M3 18c3-6 6 6 9 0s6-6 9 0" />
+      <circle cx="3" cy="18" r="1.5" />
+      <circle cx="21" cy="18" r="1.5" />
+    </Svg>
+  );
+}
+
+/* 跑团 — 骰子（Phase 4） */
+export function IconDice(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="7" y="7" width="10" height="10" rx="2.5" transform="rotate(45 12 12)" />
+      <circle cx="10.5" cy="10.5" r="0.9" />
+      <circle cx="12" cy="13.5" r="0.9" />
+      <circle cx="13.5" cy="10.5" r="0.9" />
+    </Svg>
+  );
+}
+
+/* 角色模拟 — 双人剪影（Phase 3） */
+export function IconSimulation(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <circle cx="8.5" cy="8" r="3" />
+      <path d="M3 19c0-3 2.5-4.5 5.5-4.5S14 16 14 19" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M14.5 18.5c.3-2.4 2-3.6 4-3.6s3.2 1.2 3.5 3.6" />
+    </Svg>
+  );
+}
+
 /* ===== 编辑器右键菜单专用图标 ===== */
 
 /* 从选区新建实体 — 方框加号 */

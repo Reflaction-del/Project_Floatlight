@@ -72,8 +72,8 @@ export interface TabItem {
   id: string;
   title: string;
   icon?: string;
-  kind: 'doc' | 'module' | 'timeline' | 'drafts' | 'entity' | 'start';
-  /** doc => 文档 id；module => ModuleKey；timeline => 时间轴 id；entity => 实体 id */
+  kind: 'doc' | 'module' | 'timeline' | 'drafts' | 'entity' | 'start' | 'outline' | 'simulation' | 'ttrpg';
+  /** doc => 文档 id；module => ModuleKey；timeline => 时间轴 id；entity => 实体 id；outline/simulation => ref 名 */
   ref: string;
 }
 

@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// 发布签名：读取本机 android/keystore.properties（已被 .gitignore 忽略，不入库）。
+// 文件缺失时回退 AGP debug 密钥库，保证未配置密码的环境也能构建（产物可侧载）。
+def keystoreProps = new Properties()
+def keystorePropFile = file('../keystore.properties') // 相对本模块(android/app) → android/keystore.properties
+if (keystorePropFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropFile))
+}
+
 android {
     namespace = "com.fugu.light.editor"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,13 +24,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            // 本机构建环境未配置发布密钥库；用 AGP 自动生成的 debug 密钥库为 release 签名，
-            // 产物可正常侧载安装。正式分发请改为自有 release keystore。
-            signingConfig signingConfigs.debug
+            // 配置了 android/keystore.properties（自有 keystore）时用 release 签名正式分发；
+            // 未配置（如 CI/新环境）回退 debug 密钥库，产物可正常侧载安装。
+            signingConfig keystorePropFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
