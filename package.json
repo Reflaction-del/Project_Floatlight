@@ -128,7 +128,8 @@
       "dist/**/*",
       "electron-main.cjs",
       "preload.cjs",
-      "package.json"
+      "package.json",
+      "src/features/ttrpg/lan/**/*"
     ],
     "win": {
       "target": [
