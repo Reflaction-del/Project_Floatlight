@@ -571,6 +571,20 @@ export function CopilotSidebar() {
           msgsRef.current = [...msgsRef.current, msg];
         },
         onToolResult: (name, result) => {
+          // P5+：material.create 会返回 JSON 含 imageMarkdown（AI 生图 dataURL），整段渲染为图片消息
+          try {
+            const j = JSON.parse(result ?? '');
+            if (j && typeof j.imageMarkdown === 'string' && j.imageMarkdown.includes('data:image/')) {
+              const tip: any = { role: 'tool', content: `✅ ${name} 已生成图像：${j.message ?? ''}` };
+              setMsgs((p) => [...p, tip]);
+              msgsRef.current = [...msgsRef.current, tip];
+              // 图片作为下一条 tool 消息（marked 渲染 ![](dataURL) 为 img；sanitizeHtml 需允许 data:image）
+              const img: any = { role: 'tool', content: j.imageMarkdown };
+              setMsgs((p) => [...p, img]);
+              msgsRef.current = [...msgsRef.current, img];
+              return;
+            }
+          } catch {}
           const preview = (result ?? '').slice(0, 240);
           const msg: any = { role: 'tool', content: `✅ ${name} 返回：${preview}${result && result.length > 240 ? '…' : ''}` };
           setMsgs((p) => [...p, msg]);

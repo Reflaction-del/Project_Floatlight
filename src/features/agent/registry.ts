@@ -170,25 +170,46 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         },
         required: ['prompt'],
       },
-      execute: (args) => {
-        const mod = String(args.module ?? '').toLowerCase();
+      execute: async (args) => {
+        const prompt = String(args.prompt ?? '').trim();
+        const referenceImage = args.referenceImage ? String(args.referenceImage) : '';
         try {
           const ui = require('../../store/uiStore').useUIStore.getState();
           ui.openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' });
         } catch {}
-        // 预填参数：写到 sessionStorage 让物料生成器首次加载读取（轻量，无 store 改动）
+        // 预填：让物料生成器读 sessionStorage 自动填字段（含 prompt）
         const prefill = {
-          prompt: String(args.prompt ?? ''),
+          prompt,
+          aiFieldKey: 'ai_bio',
           category: String(args.category ?? 'character'),
           styleId: args.styleId ? String(args.styleId) : '',
-          referenceImage: args.referenceImage ? String(args.referenceImage) : '',
+          referenceImage,
           refEntityIds: Array.isArray(args.refEntityIds) ? args.refEntityIds.map(String) : [],
         };
         try { sessionStorage.setItem('fl:material:prefill', JSON.stringify(prefill)); } catch {}
+        // P5+：尝试主动调用 generateImage，若 endpoint 支持/返回图则一并返回给模型展示
+        let imageMarkdown = '';
+        let aiImgNote = '';
+        if (prompt) {
+          try {
+            const ai = require('../../utils/ai');
+            const { dataUrl } = await ai.generateImage({ prompt, refImageDataUrl: referenceImage || undefined });
+            // 用 markdown 图片标签嵌入；侧栏 sanitizeHtml 需支持 img（已支持 dataURL）
+            imageMarkdown = `\n\n![AI 生成的物料图](data:image/png;base64,${dataUrl.split(',')[1] || ''})`;
+            aiImgNote = '（已直接生成图像，可右键保存或继续在物料生成器中精调）';
+          } catch (e: any) {
+            const msg = String(e?.message ?? e);
+            const noImg = /\/images\/generations|not supported|unsupported|400|404|405|Method not allowed/i.test(msg);
+            aiImgNote = noImg
+              ? '（当前 AI 模型不支持生图；请在 设置 → 大模型接入 添加支持图像生成的 endpoint，或在打开的物料生成器手动点「🎨 AI 生图」）'
+              : '（自动生图失败：' + msg.slice(0, 120) + '；已为你打开编辑器，可手动操作）';
+          }
+        }
         return JSON.stringify({
           ok: true,
-          message: '已打开可视化编辑器并预填参数。请在打开的视图调整后点击「导出 PNG/PDF」完成。建议进一步在编辑器中精调风格/排版/文本字段。',
+          message: '已打开可视化编辑器并预填参数。' + aiImgNote,
           prefill,
+          imageMarkdown,
         });
       },
     },

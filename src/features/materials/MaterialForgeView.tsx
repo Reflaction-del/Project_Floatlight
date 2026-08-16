@@ -82,6 +82,24 @@ export function MaterialForgeView() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [aiFieldKey, setAiFieldKey] = useState('ai_bio');
+  const [aiImgPrompt, setAiImgPrompt] = useState('');
+  const [aiImgBusy, setAiImgBusy] = useState(false);
+  const [aiImgMsg, setAiImgMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [aiImgResult, setAiImgResult] = useState<string | null>(null);
+
+  // P5 工具 prefill：模型调用 material.create 时把参数写入 sessionStorage，
+  // 这里读取并自动填充（修复「字段未自动填充」bug）
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('fl:material:prefill');
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      if (typeof p.prompt === 'string' && p.prompt.trim()) setAiImgPrompt(p.prompt);
+      if (typeof p.aiFieldKey === 'string' && p.aiFieldKey.trim()) setAiFieldKey(p.aiFieldKey);
+      // 一次性：读后立即清空，避免下次打开被旧值污染
+      sessionStorage.removeItem('fl:material:prefill');
+    } catch {}
+  }, []);
   const [aiTextBusy, setAiTextBusy] = useState(false);
   const [aiTextMsg, setAiTextMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   // 切换模板 / 风格时，导出尺寸应同步变化以匹配预览；
@@ -242,6 +260,43 @@ export function MaterialForgeView() {
       setAiTextMsg({ kind: 'err', text: '生成失败：' + (err?.message || String(err)) });
     } finally {
       setAiTextBusy(false);
+    }
+  }
+
+  /** P5：AI 生图（generateImage 走 OpenAI 兼容 /images/generations）
+   *  使用当前模型的端点；若有 prompt 则把生成的图返回预览。
+   *  若当前模型是纯 LLM（不支持 /images/generations），generateImage 会抛错——提示去配置生图 endpoint。 */
+  async function handleGenImg() {
+    if (!aiImgPrompt.trim() || !activeEntity) return;
+    setAiImgBusy(true);
+    setAiImgMsg(null);
+    setAiImgResult(null);
+    try {
+      const model = getCurrentModel();
+      if (!model) {
+        setAiImgMsg({ kind: 'err', text: '未配置 AI 模型：打开 设置 → 大模型接入 添加。' });
+        return;
+      }
+      // 若选定了实体，使用其上传头像或 AI 增强头像作为参考图锁定一致性
+      let refUrl: string | undefined;
+      const portrait = (activeEntity as any)?.portrait;
+      if (portrait?.uploadSrc) refUrl = portrait.uploadSrc;
+      else if (portrait?.url) refUrl = portrait.url;
+      const { dataUrl } = await generateImage({ prompt: aiImgPrompt.trim(), refImageDataUrl: refUrl });
+      setAiImgResult(dataUrl);
+      setAiImgMsg({ kind: 'ok', text: '已生成图像（可右键另存，或继续在预览区使用）。' });
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      // 友好提示：endpoint 不支持生图（多数纯 LLM endpoint 返回 400/404/405）
+      setAiImgMsg({
+        kind: 'err',
+        text:
+          /images\/generations/.test(msg) || /not supported|unsupported|400|404|405|Method not allowed/i.test(msg)
+            ? '当前 AI 模型不支持生图：请在 设置 → 大模型接入 添加支持图像生成的 endpoint（DALL-E / Qwen-Image / SD 兼容网关 / LM Studio 本地图像模型 等）。'
+            : msg,
+      });
+    } finally {
+      setAiImgBusy(false);
     }
   }
 
@@ -576,6 +631,44 @@ export function MaterialForgeView() {
             )}
             <div className="mf-ai-hint">
               生成结果写入所选实体的 materialFields[key]（即 customField 按 key 映射）；模板可用 {'{customField:' + (aiFieldKey.trim() || 'ai_bio') + '}'} 绑定展示。
+            </div>
+          </div>
+
+          <div className="mf-section">
+            <div className="mf-section-title">AI 生图</div>
+            <div className="mf-field">
+              <label>生图提示词</label>
+              <textarea
+                value={aiImgPrompt}
+                onChange={(e) => setAiImgPrompt(e.target.value)}
+                placeholder="描述你想生成的视觉内容（角色/场景/构图/风格）。配合参考图自动锁定一致性。"
+                rows={3}
+                style={{ resize: 'vertical', width: '100%' }}
+              />
+            </div>
+            <button
+              className="mf-export-btn"
+              style={{ width: '100%' }}
+              onClick={handleGenImg}
+              disabled={aiImgBusy || !aiImgPrompt.trim() || !activeEntity}
+            >
+              {aiImgBusy ? '生成中…' : '🎨 AI 生图'}
+            </button>
+            {aiImgMsg && (
+              <div
+                className="mf-export-status"
+                style={{ color: aiImgMsg.kind === 'ok' ? 'var(--accent)' : 'var(--danger)' }}
+              >
+                {aiImgMsg.text}
+              </div>
+            )}
+            {aiImgResult && (
+              <div style={{ marginTop: 8 }}>
+                <img src={aiImgResult} alt="AI 生成的物料图" style={{ maxWidth: '100%', borderRadius: 6, border: '1px solid var(--border)' }} />
+              </div>
+            )}
+            <div className="mf-ai-hint">
+              调用当前 AI 模型的 /images/generations 端点（OpenAI 兼容）。若当前模型是纯 LLM（如 Qwen3.8-27B）会失败——请在「设置 → 大模型接入」添加支持生图的模型（DALL-E / Qwen-Image / Stable Diffusion 兼容网关等）。
             </div>
           </div>
 

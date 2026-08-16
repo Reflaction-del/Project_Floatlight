@@ -28,13 +28,13 @@ describe('P5 工具能力 buildToolsPayload', () => {
     const t = ctx.tools.find((x) => x.name === 'material.create')!;
     expect(t).toBeDefined();
     expect(t.parameters.type).toBe('object');
-    expect(t.parameters.properties.prompt).toBeDefined();
-    expect(t.parameters.properties.category.enum).toContain('character');
+    expect((t.parameters as any).properties.prompt).toBeDefined();
+    expect((t.parameters as any).properties.category.enum).toContain('character');
   });
 
   it('app.openModule 参数 module 是 enum', () => {
     const ctx = buildToolContext({ world: {} as any });
     const t = ctx.tools.find((x) => x.name === 'app.openModule')!;
-    expect(t.parameters.properties.module.enum).toEqual(['material', 'entity', 'outline', 'consistency', 'simulation', 'ttrpg']);
+    expect((t.parameters as any).properties.module.enum).toEqual(['material', 'entity', 'outline', 'consistency', 'simulation', 'ttrpg']);
   });
 });
