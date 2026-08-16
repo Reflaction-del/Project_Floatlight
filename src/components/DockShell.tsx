@@ -14,6 +14,7 @@ import { CopilotSidebar } from './CopilotSidebar';
 import { AILogPanel } from './AILogPanel';
 import { TracePanel } from '../features/agent/TracePanel';
 import { TabContent, Main } from '../App';
+import { IconDragHandle, IconClose } from './icons';
 
 /** 渲染面板内容（复用现有组件；module 类经 TabContent 渲染） */
 export function PanelView({ panel }: { panel: DockPanel }) {
@@ -120,7 +121,7 @@ function Dock({ col }: { col: DockId }) {
                 onClick={() => useWorkspaceStore.setState((st) => ({ docks: { ...st.docks, [col]: { ...st.docks[col], active: p.id } } }))}
               >
                 {p.title}
-                <span className="dock-tab-close" onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}>×</span>
+                <span className="dock-tab-close" onClick={(e) => { e.stopPropagation(); closePanel(p.id); }}><IconClose size={10} /></span>
               </span>
             ))}
           </div>
@@ -129,8 +130,8 @@ function Dock({ col }: { col: DockId }) {
           <div className="dock-panel" draggable onDragStart={(e) => { e.dataTransfer.setData('text/plain', activePanel.id); e.dataTransfer.effectAllowed = 'move'; setDragging(activePanel.id, null); }}>
             <div className="dock-panel-head">
               <span className="dock-panel-title">{activePanel.title}</span>
-              <span className="dock-panel-drag-tip" title="按住拖动到任意停靠区">⠿</span>
-              <button className="dock-panel-close" onClick={() => closePanel(activePanel.id)} title="关闭面板">×</button>
+              <span className="dock-panel-drag-tip" title="按住拖动到任意停靠区"><IconDragHandle size={12} /></span>
+              <button className="dock-panel-close" onClick={() => closePanel(activePanel.id)} title="关闭面板"><IconClose size={12} /></button>
             </div>
             <div className="dock-panel-body">
               <PanelView panel={activePanel} />
@@ -181,8 +182,8 @@ function FloatingWindow({ item }: { item: FloatingItem }) {
     >
       <div className="floating-head" onMouseDown={startMove}>
         <span className="dock-panel-title">{item.panel.title}</span>
-        <span className="dock-panel-drag-tip" title="拖到停靠区放回，或点击头部拖动位置">⠿</span>
-        <button className="dock-panel-close" onClick={() => closeFloating(item.panel.id)} title="关闭">×</button>
+        <span className="dock-panel-drag-tip" title="拖到停靠区放回，或点击头部拖动位置"><IconDragHandle size={12} /></span>
+        <button className="dock-panel-close" onClick={() => closeFloating(item.panel.id)} title="关闭"><IconClose size={12} /></button>
       </div>
       <div className="floating-body" ref={ref}>
         <PanelView panel={item.panel} />

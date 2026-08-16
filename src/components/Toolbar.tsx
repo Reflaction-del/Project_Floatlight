@@ -5,7 +5,7 @@ import { WORKSPACE_PRESETS } from '../features/workspace/presets';
 import { usePromptStore } from '../store/promptStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
-import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice, IconDoc } from './icons';
+import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconLayout, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice, IconDoc } from './icons';
 
 
 const TEMPLATES = [
@@ -121,7 +121,7 @@ export function Toolbar() {
         title="工作区（按创作场景切换布局，可拖拽面板到任意停靠区）"
         onClick={() => setWsOpen((v) => !v)}
       >
-        <IconGlobe />
+        <IconLayout />
       </button>
       {wsOpen && (
         <div className="ws-menu" onMouseDown={(e) => e.stopPropagation()}>

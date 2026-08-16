@@ -2,9 +2,9 @@
 // 采用 Fluent 官方图标几何（24x24 视图框，1.6 描边），不引入额外依赖，离线可构建。
 import type { CSSProperties, ReactNode } from 'react';
 
-type IconProps = { size?: number; className?: string; style?: CSSProperties };
+type IconProps = { size?: number; className?: string; style?: CSSProperties; strokeWidth?: number };
 
-export function Svg({ size = 20, className, style, children }: IconProps & { children: ReactNode }) {
+export function Svg({ size = 20, className, style, strokeWidth = 1.6, children }: IconProps & { children: ReactNode }) {
   return (
     <svg
       width={size}
@@ -12,7 +12,7 @@ export function Svg({ size = 20, className, style, children }: IconProps & { chi
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -184,6 +184,41 @@ export function IconHome(p: IconProps) {
 }
 
 /* 世界观管理 — 地球 */
+/* 工作区布局 — 四格（类 Fluent Grid） */
+export function IconLayout(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </Svg>
+  );
+}
+
+/* 拖拽手柄 — 六点（Fluent 风格） */
+export function IconDragHandle(p: IconProps) {
+  return (
+    <Svg {...p} strokeWidth={1.8}>
+      <circle cx="8.5" cy="6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="6" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="18" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="18" r="1.1" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
+/* 关闭 — 线条 ×（Fluent Dismiss） */
+export function IconClose(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M6 6 L18 18 M18 6 L6 18" />
+    </Svg>
+  );
+}
+
 export function IconGlobe(p: IconProps) {
   return (
     <Svg {...p}>
