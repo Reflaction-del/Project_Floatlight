@@ -3934,3 +3934,10 @@ button:active,
 /* 大纲节点行内：关联文档操作 */
 .ol-link.add { color: #2ea043; font-weight: 700; }
 .ol-link-select { font-size: 11px; padding: 1px 4px; border: 1px solid var(--border); border-radius: 5px; background: transparent; color: inherit; max-width: 90px; }
+
+/* ============ P2 体验优化样式 ============ */
+/* tab 横向滚动（防溢出挤压） */
+.tabs { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.tab-ctx-menu { position: fixed; z-index: 3000; background: var(--bg, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.15); padding: 4px; min-width: 110px; }
+.tab-ctx-menu button { display: block; width: 100%; text-align: left; padding: 6px 10px; font-size: 12px; border: none; background: transparent; color: inherit; border-radius: 6px; cursor: pointer; }
+.tab-ctx-menu button:hover { background: rgba(0,0,0,.06); }

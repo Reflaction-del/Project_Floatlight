@@ -5,7 +5,7 @@ import type { MaterialStyle, GeneratedMaterial, MaterialTemplate } from '../feat
 import { GUIDE_DOCS } from '../seed/guide';
 import type { Proposal, ChatSession } from './proposalTypes';
 import type { OutlineNode } from '../features/outline/types';
-import { removeSubtree, moveNode as moveOutlineNode, nextOrder } from '../features/outline/outlineOps';
+import { removeSubtree, moveNode as moveOutlineNode, nextOrder, collectSubtreeIds } from '../features/outline/outlineOps';
 import type { Simulation, SimEvent, SubAgent, SimEventKind } from '../features/simulation/types';
 import type { BridgeEntry } from '../features/bridge/types';
 import type { Rulebook, TTRPGSession, SessionTurn } from '../features/ttrpg/types';
@@ -90,6 +90,8 @@ export interface WorldData {
   chats: ChatSession[];
   /** 全局大纲（Phase 1）：树形结构，parentId 递归任意深度 */
   outline: OutlineNode[];
+  /** 大纲删除回收（P2）：最近删除的子树，可一键恢复（上限 30 条） */
+  outlineTrash: OutlineNode[];
   /** 角色模拟（Phase 3）：多子代理沙盘/导演式会话 */
   simulations: Simulation[];
   /** 演示种子版本号（仅演示世界带此字段）；< CURRENT_SEED_VERSION 时启动时强制升级到最新演示 */
@@ -207,6 +209,8 @@ interface WorldState {
   }) => string;
   updateOutlineNode: (id: string, patch: Partial<OutlineNode>) => void;
   deleteOutlineNode: (id: string) => void;
+  /** P2：恢复最近一次删除的大纲子树 */
+  restoreOutlineTrash: () => boolean;
   /** 移动节点到新父级/位置；非法（成环）返回 false */
   moveOutlineNode: (id: string, newParentId: string | null, newOrder: number) => boolean;
   /* ——— 角色模拟（Phase 3） ——— */
@@ -238,6 +242,7 @@ function emptyTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    outlineTrash: [],
     simulations: [],
     bridgeLog: [],
     rulebooks: [],
@@ -271,6 +276,7 @@ function novelTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    outlineTrash: [],
     simulations: [],
     bridgeLog: [],
     rulebooks: [],
@@ -297,6 +303,7 @@ function scriptTemplate(): WorldData {
     proposals: [],
     chats: [],
     outline: [],
+    outlineTrash: [],
     simulations: [],
     bridgeLog: [],
     rulebooks: [],
@@ -993,6 +1000,7 @@ export const DEFAULT_DATA: WorldData = {
   proposals: [DEMO_PROPOSAL],
   chats: [],
   outline: [],
+    outlineTrash: [],
     simulations: [],
     bridgeLog: [],
     rulebooks: [],
@@ -1546,10 +1554,31 @@ export const useWorldStore = create<WorldState>((set, get): WorldState => {
     deleteOutlineNode: (id) => {
       set((s) => {
         const wd = s.worldsData[s.current]; if (!wd) return s;
+        const removed = (wd.outline ?? []).filter((n) => n.id === id || collectSubtreeIds(wd.outline ?? [], id).includes(n.id));
         const outline = removeSubtree(wd.outline ?? [], id);
-        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline } }, dirty: true };
+        const trash = [...removed, ...(wd.outlineTrash ?? [])].slice(0, 30); // 最近删除在前
+        const next = { ...s, worldsData: { ...s.worldsData, [s.current]: { ...wd, outline, outlineTrash: trash } }, dirty: true };
         saveAllData(next.worldsData); return next;
       });
+    },
+    /** P2：恢复最近一次删除的大纲子树（含子节点）；无回收返回 false */
+    restoreOutlineTrash: () => {
+      const st = get();
+      const wd = st.worldsData[st.current]; if (!wd) return false;
+      const trash = wd.outlineTrash ?? [];
+      if (trash.length === 0) return false;
+      // 取最近删除的完整子树（多条记录可能属于同一次删除）
+      const rootId = trash[0].id;
+      const subtree = trash.filter((n) => n.id === rootId || trash.some((t) => t.id === n.parentId) || collectSubtreeIds(trash, rootId).includes(n.id));
+      // 子树内的父子都要恢复；从 trash 移除子树
+      const rest = trash.filter((n) => !subtree.some((t) => t.id === n.id));
+      // 追加回 outline（保持 order）
+      set((st2) => {
+        const w = st2.current; const w2 = st2.worldsData[w]; if (!w2) return st2;
+        const next = { ...st2, worldsData: { ...st2.worldsData, [w]: { ...w2, outline: [...(w2.outline ?? []), ...subtree], outlineTrash: rest } }, dirty: true };
+        saveAllData(next.worldsData); return next;
+      });
+      return true;
     },
     moveOutlineNode: (id, newParentId, newOrder) => {
       const s = get();

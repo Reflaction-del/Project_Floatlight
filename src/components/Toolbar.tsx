@@ -33,11 +33,14 @@ export function Toolbar() {
   const [savedFlash, setSavedFlash] = useState(false);
   const activeModule = useUIStore((s) => s.module);
 
+  const [lastSaved, setLastSaved] = useState<number>(Date.now());
   const onSave = () => {
     saveNow();
     setSavedFlash(true);
+    setLastSaved(Date.now());
     setTimeout(() => setSavedFlash(false), 1800);
   };
+  const lastSavedLabel = new Date(lastSaved).toLocaleTimeString('zh-CN', { hour12: false });
 
 
   const doSwitch = async (name: string) => {
@@ -67,7 +70,7 @@ export function Toolbar() {
       <button className={'tool-btn' + (activeModule === 'relations' ? ' mod-active' : '')} title="线索板" onClick={() => openTab({ title: '线索板', icon: 'relations', kind: 'module', ref: 'relations' })}><IconRelations /></button>
       <button className={'tool-btn' + (activeModule === 'consistency' ? ' mod-active' : '')} title="一致性检查" onClick={() => openTab({ title: '一致性检查', icon: 'consistency', kind: 'module', ref: 'consistency' })}><IconConsistency /></button>
       <button className={'tool-btn' + (activeModule === 'share' ? ' mod-active' : '')} title="协作与分享" onClick={() => openTab({ title: '协作与分享', icon: 'share', kind: 'module', ref: 'share' })}><IconShare /></button>
-      <button className={'tool-btn' + (activeModule === 'materials' ? ' mod-active' : '')} title="可视化编辑器" onClick={() => openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' })}><IconMaterials /></button>
+      <button className={'tool-btn' + (activeModule === 'materials' ? ' mod-active' : '')} title="可视化编辑器（视觉物料生成：角色卡 / 插图 / 批量导出 PNG·PDF）" onClick={() => openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' })}><IconMaterials /></button>
       <span className="spacer" style={{ flex: 1 }} />
       <button
         className={'tool-btn' + (fileTreeOpen ? ' active' : '')}
@@ -99,7 +102,7 @@ export function Toolbar() {
         <IconTrace />
       </button>
       <div className="save-group">
-        <button className={'tool-btn save-btn' + (savedFlash ? ' flash' : '')} onClick={onSave} title="保存当前世界（数据已自动保存）">{savedFlash ? '✓' : <IconSave />}</button>
+        <button className={'tool-btn save-btn' + (savedFlash ? ' flash' : '')} onClick={onSave} title={`保存当前世界（数据已自动保存 · ${lastSavedLabel}）`}>{savedFlash ? '✓' : <IconSave />}</button>
       </div>
       <button className={'tool-btn' + (activeModule === 'settings' ? ' mod-active' : '')} title="设置" onClick={() => openTab({ title: '设置', icon: 'settings', kind: 'module', ref: 'settings' })}><IconSettings /></button>
       {wmOpen && <WorldviewModal onClose={() => setWmOpen(false)} onSwitch={doSwitch} />}
@@ -189,7 +192,7 @@ function WorldviewModal({ onClose, onSwitch }: { onClose: () => void; onSwitch: 
                 <button className="mode-btn active wm-new-btn" onClick={doNew}>＋ 新建</button>
               </div>
             </div>
-            <div className="wm-tip">选择模板后点「＋ 新建」</div>
+            <div className="wm-tip">{(TEMPLATES.find((t) => t.key === template)?.desc ?? '') + ' · 点「＋ 新建」'}</div>
           </div>
           <div className="wm-detail-col">
             {current ? (

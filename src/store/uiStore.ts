@@ -79,6 +79,10 @@ interface UIState {
   /** 根据开关设置确保开始页标签的存在/移除（用于启动恢复与开关切换） */
   ensureStartPage: () => void;
   closeTab: (id: string) => void;
+  /** P2：关闭除指定 tab 外的全部（保留启动页） */
+  closeOtherTabs: (id: string) => void;
+  /** P2：关闭全部 tab（保留启动页） */
+  closeAllTabs: () => void;
   closeTabsByRef: (kind: OpenTabInput['kind'], ref: string) => void;
   setActiveTab: (id: string) => void;
   setSplitTab: (id: string | null) => void;
@@ -194,6 +198,21 @@ export const useUIStore = create<UIState>((set, get) => ({
       let splitTabId = wasSplit ? null : s.splitTabId;
       if (splitTabId && splitTabId === activeTabId) splitTabId = null;
       return { tabs, activeTabId, module, splitTabId };
+    }),
+  closeOtherTabs: (id) =>
+    set((s) => {
+      const keep = s.tabs.filter((t) => t.id === id || t.kind === 'start');
+      const removed = s.tabs.some((t) => t.id !== id && t.kind !== 'start');
+      if (!removed) return {};
+      const activeTabId = s.tabs.find((t) => t.id === id) ? id : keep[0]?.id ?? null;
+      return { tabs: keep, activeTabId, module: undefined as any };
+    }),
+  closeAllTabs: () =>
+    set((s) => {
+      const keep = s.tabs.filter((t) => t.kind === 'start');
+      const removed = s.tabs.length > keep.length;
+      if (!removed) return {};
+      return { tabs: keep, activeTabId: keep[0]?.id ?? null, module: undefined as any };
     }),
   closeTabsByRef: (kind, ref) =>
     set((s) => {

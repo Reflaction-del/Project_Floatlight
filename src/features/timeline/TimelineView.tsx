@@ -12,6 +12,7 @@ const UNIT_LABEL: Record<TimelineUnit, string> = {
 
 export function TimelineView({ timelineId }: { timelineId?: string }) {
   const timelines = useWorldStore((s) => s.worldsData[s.current]?.timelines ?? []);
+  const docs = useWorldStore((s) => s.worldsData[s.current]?.docs ?? []);
   const activeTimelineId = useWorldStore((s) => s.worldsData[s.current]?.activeTimelineId ?? '');
   const setActiveTimeline = useWorldStore((s) => s.setActiveTimeline);
   const addTimeline = useWorldStore((s) => s.addTimeline);
@@ -169,6 +170,25 @@ export function TimelineView({ timelineId }: { timelineId?: string }) {
     updateTimelineEvent(tl.id, sel.id, { entityId: v.entityId || undefined });
   };
 
+  const linkDocToNode = async () => {
+    setMenu(null);
+    if (!sel) return;
+    const docOptions = [{ value: '', label: '（取消关联）' }, ...docs.map((d) => ({ value: d.id, label: d.title }))];
+    const v = await prompt({
+      title: '关联到文档',
+      fields: [{ name: 'docId', label: '选择文档', type: 'select', options: docOptions, default: sel.docId || '' }],
+    });
+    if (!v) return;
+    updateTimelineEvent(tl.id, sel.id, { docId: v.docId || undefined });
+  };
+
+  const openLinkedDoc = () => {
+    setMenu(null);
+    if (!sel?.docId || !docs.find((d) => d.id === sel.docId)) return;
+    const d = docs.find((x) => x.id === sel.docId)!;
+    useUIStore.getState().openTab({ title: d.title, icon: d.icon, kind: 'doc', ref: d.id });
+  };
+
   const editNode = async () => {
     setMenu(null);
     if (!sel) return;
@@ -295,10 +315,16 @@ export function TimelineView({ timelineId }: { timelineId?: string }) {
       {menu && (
         <div className="ctx-menu" style={{ top: menu.y, left: menu.x }} onMouseDown={(e) => e.stopPropagation()}>
           {sel && linkedEntity && (
-            <button className="ctx-item" onClick={openLinkedEntity}>打开关联实体：{linkedEntity.name}</button>
+            <>
+              <button className="ctx-item" onClick={openLinkedEntity}>打开关联实体：{linkedEntity.name}</button>
+              {sel?.docId && <button className="ctx-item" onClick={openLinkedDoc}>打开关联文档：{docs.find((d) => d.id === sel.docId)?.title ?? '（已删除）'}</button>}
+            </>
           )}
           {sel && (
-            <button className="ctx-item" onClick={linkEntityToNode}>{sel.entityId ? '更换关联实体' : '关联到实体'}</button>
+            <>
+              <button className="ctx-item" onClick={linkEntityToNode}>{sel.entityId ? '更换关联实体' : '关联到实体'}</button>
+              <button className="ctx-item" onClick={linkDocToNode}>{sel.docId ? '更换关联文档' : '关联到文档'}</button>
+            </>
           )}
           {sel && <div className="ctx-sep" />}
           {sel && (

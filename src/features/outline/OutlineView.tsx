@@ -180,6 +180,8 @@ export function OutlineView() {
   const update = useWorldStore((s) => s.updateOutlineNode);
   const openTab = useUIStore((s) => s.openTab);
   const [showLedger, setShowLedger] = useState(false);
+  const restoreOutlineTrash = useWorldStore((s) => s.restoreOutlineTrash);
+  const trashCount = useWorldStore((s) => (s.worldsData[s.current]?.outlineTrash ?? []).length);
 
   const tree = useMemo(() => treeify(outline), [outline]);
   const ledger = useMemo(() => scanForeshadow(outline), [outline]);
@@ -195,6 +197,11 @@ export function OutlineView() {
         <button className="mode-btn" onClick={() => setShowLedger((v) => !v)} title="伏笔账本：已埋设未回收的伏笔">
           伏笔{ledger.counts.open > 0 ? `（${ledger.counts.open}）` : ''}
         </button>
+        {trashCount > 0 && (
+          <button className="mode-btn" onClick={() => { if (restoreOutlineTrash()) alert('已恢复最近删除的大纲节点'); }} title={`撤销删除（可恢复 ${trashCount} 个节点）`}>
+            ↩ 撤销删除{trashCount}
+          </button>
+        )}
       </div>
 
       {showLedger && (

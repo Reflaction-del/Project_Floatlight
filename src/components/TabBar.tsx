@@ -9,6 +9,15 @@ export function TabBar() {
   const activeTabId = useUIStore((s) => s.activeTabId);
   const splitTabId = useUIStore((s) => s.splitTabId);
   const closeTab = useUIStore((s) => s.closeTab);
+  const closeOtherTabs = useUIStore((s) => s.closeOtherTabs);
+  const closeAllTabs = useUIStore((s) => s.closeAllTabs);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    const t = setTimeout(() => document.addEventListener('mousedown', close), 0);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', close); };
+  }, [ctxMenu]);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const setSplitTab = useUIStore((s) => s.setSplitTab);
   const openTab = useUIStore((s) => s.openTab);
@@ -111,7 +120,10 @@ export function TabBar() {
                 (dragOverId && dragOverId === tab.id && dragRef.current && dragRef.current !== tab.id ? ' drag-over' : '')
               }
               onClick={() => setActiveTab(tab.id)}
-              onContextMenu={(e) => { e.preventDefault(); if (!isOnlyStart(tab)) closeTab(tab.id); }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (!isOnlyStart(tab)) setCtxMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
+              }}
               draggable
               onDragStart={(e) => { dragRef.current = tab.id; setDragOverId(null); e.dataTransfer.effectAllowed = 'move'; }}
               onDragOver={(e) => {
@@ -144,6 +156,13 @@ export function TabBar() {
           ))}
         </div>
 
+        {ctxMenu && (
+          <div className="tab-ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onMouseDown={(e) => e.stopPropagation()}>
+            <button onClick={() => { closeTab(ctxMenu.tabId); setCtxMenu(null); }}>关闭当前</button>
+            <button onClick={() => { closeOtherTabs(ctxMenu.tabId); setCtxMenu(null); }}>关闭其他</button>
+            <button onClick={() => { closeAllTabs(); setCtxMenu(null); }}>关闭全部</button>
+          </div>
+        )}
         <div className="search-wrap">
         <input
           id="global-search-input"

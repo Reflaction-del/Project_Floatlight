@@ -47,6 +47,8 @@ export interface TimelineEvent {
   impact?: number;
   /** 关联的实体 id。一个实体可拥有多个时间轴节点（1:N）。 */
   entityId?: string;
+  /** 关联的文档 id（P2：事件可挂正文章节） */
+  docId?: string;
 }
 
 export type TimelineUnit = 'year' | 'month' | 'day' | 'custom';

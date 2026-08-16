@@ -11,7 +11,8 @@ import type { TTRPGSession } from './types';
 import type { WorldData } from '../../store/worldStore';
 
 const rulebook = BUILTIN_RULEBOOKS[0]; // dnd5e: formula 1d20+{attr}+{skill}, normal=15
-const world = () => ({ entities: [], relations: [], outline: [], timelines: [], docs: [], folders: [], styles: [], materials: [], templates: [], drafts: [], activeDocId: '', activeTimelineId: '', clueBoard: {}, proposals: [], chats: [], simulations: [], bridgeLog: [], rulebooks: [], ttrpgSessions: [] }) as WorldData;
+const world = () => ({ entities: [], relations: [], outline: [],
+    outlineTrash: [], timelines: [], docs: [], folders: [], styles: [], materials: [], templates: [], drafts: [], activeDocId: '', activeTimelineId: '', clueBoard: {}, proposals: [], chats: [], simulations: [], bridgeLog: [], rulebooks: [], ttrpgSessions: [] }) as WorldData;
 
 const session = (over: Partial<TTRPGSession> = {}): TTRPGSession => ({
   id: 'tt-1', mode: 'ai-gm', title: '测试跑团', rulebookId: rulebook.id, gmName: 'GM',

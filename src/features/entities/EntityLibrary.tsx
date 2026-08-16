@@ -1,3 +1,4 @@
+import { ensureAIModel } from '../../utils/aiGuard';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useWorldStore } from '../../store/worldStore';
 import { useUIStore } from '../../store/uiStore';
@@ -83,8 +84,8 @@ export function EntityLibrary() {
               placeholder="搜索名称或标签"
               className="el-search"
             />
-            <button className="mode-btn" onClick={() => setShowImport(true)}>导入文章并抽取</button>
-            <button className="mode-btn" onClick={() => setShowLinker(true)}>实体关联</button>
+            <button className="mode-btn" onClick={() => { if (ensureAIModel('导入文章并抽取')) setShowImport(true); }}>导入文章并抽取</button>
+            <button className="mode-btn" onClick={() => { if (ensureAIModel('实体关联')) setShowLinker(true); }}>实体关联</button>
             <button className="mode-btn active" onClick={() => setAdding((v) => !v)}>＋ 新建实体</button>
           </div>
         </div>
