@@ -85,6 +85,34 @@ describe('workspaceStore Dock 布局', () => {
     expect(useWorkspaceStore.getState().docks.bottom.panels.map((p) => p.id)).toContain('trace');
   });
 
+  it('floatPanel 拖出为浮动窗口 / unfloatPanel 放回（回上次位置）', () => {
+    const st = useWorkspaceStore.getState();
+    st.floatPanel('filetree', 120, 140);
+    const st2 = useWorkspaceStore.getState();
+    expect(st2.floating.some((f) => f.panel.id === 'filetree')).toBe(true);
+    expect(st2.docks.left.panels.some((p) => p.id === 'filetree')).toBe(false);
+    expect(st2.lastDockOf['filetree']).toBe('left');
+    st2.unfloatPanel('filetree');
+    const st3 = useWorkspaceStore.getState();
+    expect(st3.floating.some((f) => f.panel.id === 'filetree')).toBe(false);
+    // 回到上次位置（left）
+    expect(st3.docks.left.panels.some((p) => p.id === 'filetree')).toBe(true);
+  });
+
+  it('moveFloating / resizeFloating / closeFloating', () => {
+    const st = useWorkspaceStore.getState();
+    st.addPanel('entities', 'right');
+    st.floatPanel('entities', 200, 200);
+    st.moveFloating('entities', 300, 260);
+    let f = useWorkspaceStore.getState().floating.find((x) => x.panel.id === 'entities')!;
+    expect(f.x).toBe(300);
+    st.resizeFloating('entities', 500, 400);
+    f = useWorkspaceStore.getState().floating.find((x) => x.panel.id === 'entities')!;
+    expect(f.w).toBe(500);
+    st.closeFloating('entities');
+    expect(useWorkspaceStore.getState().floating.some((x) => x.panel.id === 'entities')).toBe(false);
+  });
+
   it('saveAsCustom 保存当前布局为新工作区', () => {
     const st = useWorkspaceStore.getState();
     st.movePanel('filetree', 'bottom');

@@ -6,8 +6,8 @@
 // left/right 与 center 之间、bottom 顶部可拖拽调整尺寸；
 // center 永远渲染 Main（TabBar + 标签页）。
 // ============================================================
-import { Suspense, useRef } from 'react';
-import type { DockId, DockPanel } from '../features/workspace/types';
+import { Suspense, useRef, useEffect } from 'react';
+import type { DockId, DockPanel, FloatingItem } from '../features/workspace/types';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { FileTree } from './FileTree';
 import { CopilotSidebar } from './CopilotSidebar';
@@ -145,10 +145,87 @@ function Dock({ col }: { col: DockId }) {
   );
 }
 
+/** 浮动窗口：绝对定位 + 头部拖动 + 右下角缩放 + 拖回 dock */
+function FloatingWindow({ item }: { item: FloatingItem }) {
+  const moveFloating = useWorkspaceStore((s) => s.moveFloating);
+  const resizeFloating = useWorkspaceStore((s) => s.resizeFloating);
+  const closeFloating = useWorkspaceStore((s) => s.closeFloating);
+  const unfloatPanel = useWorkspaceStore((s) => s.unfloatPanel);
+  const setDragging = useWorkspaceStore((s) => s.setDragging);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const startMove = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ox = item.x, oy = item.y;
+    const move = (ev: MouseEvent) => { moveFloating(item.panel.id, ox + ev.clientX - sx, oy + ev.clientY - sy); };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ow = item.w, oh = item.h;
+    const move = (ev: MouseEvent) => { resizeFloating(item.panel.id, ow + ev.clientX - sx, oh + ev.clientY - sy); };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  return (
+    <div
+      className="floating-window"
+      style={{ left: item.x, top: item.y, width: item.w, height: item.h, zIndex: 3000 + item.z % 1000 }}
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', item.panel.id); e.dataTransfer.effectAllowed = 'move'; setDragging(item.panel.id, null); }}
+      onDragEnd={() => setDragging(null, null)}
+    >
+      <div className="floating-head" onMouseDown={startMove}>
+        <span className="dock-panel-title">{item.panel.title}</span>
+        <span className="dock-panel-drag-tip" title="拖到停靠区放回，或点击头部拖动位置">⠿</span>
+        <button className="dock-panel-close" onClick={() => closeFloating(item.panel.id)} title="关闭">×</button>
+      </div>
+      <div className="floating-body" ref={ref}>
+        <PanelView panel={item.panel} />
+      </div>
+      <div className="floating-resize" onMouseDown={startResize} title="拖动缩放" />
+    </div>
+  );
+}
+
 export function DockShell() {
   const docks = useWorkspaceStore((s) => s.docks);
+  const floating = useWorkspaceStore((s) => s.floating);
+  const draggingPanelId = useWorkspaceStore((s) => s.draggingPanelId);
+  const floatPanel = useWorkspaceStore((s) => s.floatPanel);
+  const setDragging = useWorkspaceStore((s) => s.setDragging);
+
+  // document-level drop：拖到非 dock 空白 → 浮动窗口
+  useEffect(() => {
+    const onDrop = (e: DragEvent) => {
+      const pid = e.dataTransfer?.getData('text/plain') || draggingPanelId;
+      if (!pid) return;
+      // 事件已由 dock 处理过（stopPropagation）则不重复；这里兜底浮动
+      const isDockDrop = (e.target as HTMLElement)?.closest?.('.dock');
+      if (!isDockDrop && !floating.some((f) => f.panel.id === pid)) {
+        floatPanel(pid, e.clientX, e.clientY);
+      }
+      setDragging(null, null);
+    };
+    const onDragOverDoc = (e: DragEvent) => {
+      if (!draggingPanelId) return;
+      e.preventDefault();
+    };
+    document.addEventListener('drop', onDrop);
+    document.addEventListener('dragover', onDragOverDoc);
+    return () => {
+      document.removeEventListener('drop', onDrop);
+      document.removeEventListener('dragover', onDragOverDoc);
+    };
+  }, [draggingPanelId, floating, floatPanel, setDragging]);
+
   return (
     <div className="dock-shell">
+      {floating.map((f) => <FloatingWindow key={f.panel.id} item={f} />)}
       <div className="dock-main-row">
         {docks.left.panels.length > 0 && <Dock col="left" />}
         <Dock col="center" />

@@ -3992,3 +3992,13 @@ button:active,
 .dock-main-row { align-items: stretch; }
 .dock-bottom-row { display: flex; flex-direction: column; flex: none; }
 .dock-bottom-row .dock-resize-v { flex: none; }
+
+/* 浮动窗口 */
+.floating-window { position: fixed; display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden; }
+.floating-head { display: flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid var(--border); cursor: move; user-select: none; flex: none; }
+.floating-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.floating-body .copilot { width: 100% !important; min-width: 0 !important; height: 100%; }
+.floating-resize { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; }
+
+.ws-item-icon { display: inline-flex; margin-right: 8px; opacity: .8; }
+.ws-item-label { flex: 1; }

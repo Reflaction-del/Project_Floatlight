@@ -3,10 +3,22 @@
 // ============================================================
 import { create } from 'zustand';
 import type { DockId, DockPanel, DockState, Workspace } from '../features/workspace/types';
+import type { FloatingItem } from '../features/workspace/types';
 import { WORKSPACE_PRESETS, DEFAULT_WORKSPACE, createCustomWorkspace } from '../features/workspace/presets';
 
 const LS_CURRENT = 'fl:workspace:current';
 const LS_CUSTOM = 'fl:workspace:custom';
+
+function loadFloating(): FloatingItem[] {
+  try {
+    const raw = localStorage.getItem(LS_FLOATING);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
 
 function loadCustom(): Workspace[] {
   try {
@@ -30,13 +42,24 @@ interface WorkspaceStoreState {
   draggingPanelId: string | null;
   /** 当前悬停高亮的 dock（拖拽放置目标） */
   hoverDock: DockId | null;
+  /** 浮动窗口列表 */
+  floating: FloatingItem[];
+  /** 面板上次所在 dock（关闭后重开回到原位置） */
+  lastDockOf: Record<string, DockId>;
 
   switchWorkspace: (id: string) => void;
   applyWorkspace: (ws: Workspace) => void;
   /** 把面板移动到指定 dock（拖拽放置）；targetIndex 为插入位置（可选） */
   movePanel: (panelId: string, toDock: DockId, targetIndex?: number) => void;
-  /** 往指定 dock 添加面板（已在其它 dock 则移动；不存在则创建默认面板） */
-  addPanel: (panelId: string, toDock: DockId) => void;
+  /** 往指定 dock 添加面板（已在其它 dock 则移动；不存在则创建默认面板）；toDock 缺省用上次位置 */
+  addPanel: (panelId: string, toDock?: DockId) => void;
+  /** 把面板拖出为浮动窗口 */
+  floatPanel: (panelId: string, x: number, y: number) => void;
+  /** 浮动窗口放回 dock（缺省回上次 dock） */
+  unfloatPanel: (panelId: string, toDock?: DockId) => void;
+  moveFloating: (panelId: string, x: number, y: number) => void;
+  resizeFloating: (panelId: string, w: number, h: number) => void;
+  closeFloating: (panelId: string) => void;
   closePanel: (panelId: string) => void;
   /** 调整 dock 主尺寸 */
   setDockSize: (dock: DockId, size: number) => void;
@@ -61,10 +84,18 @@ function persistCustoms(customs: Workspace[]) {
   } catch {}
 }
 
+const LS_FLOATING = 'fl:workspace:floating';
+function persistFloating(floating: FloatingItem[]) {
+  try {
+    localStorage.setItem(LS_FLOATING, JSON.stringify(floating));
+  } catch {}
+}
+
 export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => {
   // 初始化：尝试恢复上次工作区
   let initialDocks = DEFAULT_WORKSPACE.docks;
   let initialId = DEFAULT_WORKSPACE.id;
+  let initialFloating: FloatingItem[] = [];
   try {
     const raw = localStorage.getItem(LS_CURRENT);
     if (raw) {
@@ -75,13 +106,16 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => {
       }
     }
   } catch {}
+  initialFloating = loadFloating();
 
   return {
     currentId: initialId,
     docks: initialDocks,
+    floating: initialFloating,
     customs: loadCustom(),
     draggingPanelId: null,
     hoverDock: null,
+    lastDockOf: {},
 
     switchWorkspace: (id) => {
       const { customs } = get();
@@ -105,6 +139,7 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => {
       const fromPanels = from?.panels ?? [];
       const panel = fromPanels.find((p) => p.id === panelId);
       if (!panel) return;
+      if (fromDock) get().lastDockOf[panelId] = fromDock;
       // 新 dock 中已有同名面板则跳过（不允许重复）
       if (docks[toDock].panels.some((p) => p.id === panelId)) return;
 
@@ -128,6 +163,9 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => {
 
     addPanel: (panelId, toDock) => {
       const { docks } = get();
+      const dock = toDock ?? get().lastDockOf[panelId] ?? 'left';
+      const targetDock = dock as DockId;
+      toDock = targetDock;
       // 已在目标 dock？无操作
       if (docks[toDock].panels.some((p) => p.id === panelId)) {
         set({ docks: { ...docks, [toDock]: { ...docks[toDock], active: panelId } } });
@@ -170,6 +208,47 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set, get) => {
       }
       set({ docks: next });
       persist(next, get().currentId);
+    },
+
+    floatPanel: (panelId, x, y) => {
+      const { docks, floating } = get();
+      const fromDock = (Object.keys(docks) as DockId[]).find((d) => docks[d].panels.some((p) => p.id === panelId));
+      const panel = fromDock ? docks[fromDock].panels.find((p) => p.id === panelId) : null;
+      if (!panel) return;
+      if (fromDock) get().lastDockOf[panelId] = fromDock;
+      const nextDocks = { ...docks };
+      if (fromDock) {
+        nextDocks[fromDock] = { ...docks[fromDock], panels: docks[fromDock].panels.filter((p) => p.id !== panelId), active: docks[fromDock].active === panelId ? null : docks[fromDock].active };
+      }
+      const maxW = typeof window !== 'undefined' ? window.innerWidth - 240 : 1200;
+      const maxH = typeof window !== 'undefined' ? window.innerHeight - 160 : 800;
+      const item: FloatingItem = { panel, x: Math.max(40, Math.min(x, maxW)), y: Math.max(40, Math.min(y, maxH)), w: 380, h: 480, z: Date.now() };
+      set({ docks: nextDocks, floating: [...floating, item] });
+      persist(nextDocks, get().currentId);
+      persistFloating([...floating, item]);
+    },
+    unfloatPanel: (panelId, toDock) => {
+      const { floating, lastDockOf } = get();
+      const item = floating.find((f) => f.panel.id === panelId);
+      if (!item) return;
+      const rest = floating.filter((f) => f.panel.id !== panelId);
+      set({ floating: rest });
+      persistFloating(rest);
+      const dock = toDock ?? lastDockOf[panelId] ?? 'left';
+      get().addPanel(panelId, dock);
+    },
+    moveFloating: (panelId, x, y) => {
+      set((st) => ({ floating: st.floating.map((f) => (f.panel.id === panelId ? { ...f, x, y } : f)) }));
+      persistFloating(get().floating);
+    },
+    resizeFloating: (panelId, w, h) => {
+      set((st) => ({ floating: st.floating.map((f) => (f.panel.id === panelId ? { ...f, w: Math.max(200, w), h: Math.max(140, h) } : f)) }));
+      persistFloating(get().floating);
+    },
+    closeFloating: (panelId) => {
+      const rest = get().floating.filter((f) => f.panel.id !== panelId);
+      set({ floating: rest });
+      persistFloating(rest);
     },
 
     setDockSize: (dock, size) => {

@@ -40,6 +40,16 @@ export interface Workspace {
   docks: Record<DockId, DockState>;
 }
 
+/** 浮动窗口（面板拖出 dock 后独立悬浮） */
+export interface FloatingItem {
+  panel: DockPanel;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number;
+}
+
 export const DOCK_ORDER: DockId[] = ['left', 'center', 'right', 'bottom'];
 
 /** 面板 id → 图标（Toolbar 一致的 icon 名） */

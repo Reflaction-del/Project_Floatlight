@@ -5,7 +5,7 @@ import { WORKSPACE_PRESETS } from '../features/workspace/presets';
 import { usePromptStore } from '../store/promptStore';
 import { useWorldStore } from '../store/worldStore';
 import { useWorldviewStore, displayWorldName } from '../store/worldviewStore';
-import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice } from './icons';
+import { IconEntities, IconRelations, IconConsistency, IconShare, IconSettings, IconPanel, IconCopilot, IconSave, IconMaterials, IconGlobe, IconProposals, IconOutline, IconTrace, IconSimulation, IconDice, IconDoc } from './icons';
 
 
 const TEMPLATES = [
@@ -59,6 +59,17 @@ export function Toolbar() {
   const wsCurrentId = useWorkspaceStore((s) => s.currentId);
   const wsCustoms = useWorkspaceStore((s) => s.customs);
   const prompt = usePromptStore((s) => s.open);
+  const wsIcon = (icon: string) => {
+    switch (icon) {
+      case 'doc': return <IconDoc />;
+      case 'entities': return <IconEntities />;
+      case 'outline': return <IconOutline />;
+      case 'materials': return <IconMaterials />;
+      case 'dice': return <IconDice />;
+      case 'settings': return <IconSettings />;
+      default: return <IconDoc />;
+    }
+  };
   const switchWs = (id: string) => { useWorkspaceStore.getState().switchWorkspace(id); setWsOpen(false); };
   const saveWs = async () => {
     const v = await prompt({ title: '保存当前布局', fields: [{ name: 'name', label: '布局名称', placeholder: '如：我的物料布局', default: '自定义布局' }] });
@@ -117,7 +128,8 @@ export function Toolbar() {
           <div className="ws-menu-title">工作区布局</div>
           {WORKSPACE_PRESETS.map((w) => (
             <button key={w.id} className={'ws-item' + (w.id === wsCurrentId ? ' active' : '')} onClick={() => switchWs(w.id)}>
-              {w.name}
+              <span className="ws-item-icon">{wsIcon(w.icon)}</span>
+              <span className="ws-item-label">{w.name}</span>
             </button>
           ))}
           {wsCustoms.length > 0 && (
