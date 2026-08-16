@@ -89,6 +89,8 @@ export interface ChatStreamOpts {
   systemOverride?: string;
   /** 采样温度（可选） */
   temperature?: number;
+  /** 最大生成 token 数（默认 4096，避免本地模型无限制生成到 context 满卡死） */
+  maxTokens?: number;
   /** 用于手动终止模型响应的 AbortSignal */
   signal?: AbortSignal;
 }
@@ -165,7 +167,7 @@ export async function chatStream(
   let bodyStr: string;
   if (format === 'chat') {
     url = `${base}/chat/completions`;
-    const payload: Record<string, unknown> = { model: model.model, messages: buildMessages(model, systemDefault, history, opts?.systemOverride), stream: true };
+    const payload: Record<string, unknown> = { model: model.model, messages: buildMessages(model, systemDefault, history, opts?.systemOverride), stream: true, max_tokens: typeof opts?.maxTokens === 'number' ? opts.maxTokens : 4096 };
     if (typeof opts?.temperature === 'number') payload.temperature = opts.temperature;
     injectWebSearchParam(model, payload);
     bodyStr = JSON.stringify(payload);
