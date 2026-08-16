@@ -18,6 +18,10 @@ import { scanConflicts } from '../../utils/consistency';
 import { treeify } from '../outline/outlineOps';
 import { OUTLINE_KIND_LABEL, OUTLINE_STATUS_LABEL } from '../outline/types';
 import { buildWorldSnapshot } from './snapshot';
+import { useMaterialStore } from '../materials/store';
+import { useWorldStore } from '../../store/worldStore';
+import { useUIStore } from '../../store/uiStore';
+import { MATERIAL_TEMPLATES } from '../materials/templates/registry';
 import type { ToolContext, ToolDef } from '../../utils/ai';
 
 /** 工具执行钩子：写世界库前的一致性/权限校验等（返回错误字符串则拒绝执行） */
@@ -138,8 +142,7 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
       execute: () => {
         const out: any[] = [];
         try {
-          const builtin = require('../materials/templates/registry');
-          for (const t of builtin.MATERIAL_TEMPLATES ?? []) out.push(briefTemplate(t));
+          for (const t of MATERIAL_TEMPLATES ?? []) out.push(briefTemplate(t));
         } catch {}
         for (const t of ctx.world.templates ?? []) out.push(briefTemplate(t));
         if (!out.length) return '（暂无可用模板）';
@@ -174,8 +177,8 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         },
       },
       execute: (args) => {
-        const ui = require('../../features/materials/store').useMaterialStore.getState();
-        const st = require('../../store/worldStore').useWorldStore.getState();
+        const ui = useMaterialStore.getState();
+        const st = useWorldStore.getState();
         const wd = st.worldsData[st.current];
         if (!wd) return '（无当前世界）';
         const applied: string[] = [];
@@ -215,7 +218,7 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         required: ['module'],
       },
       execute: (args) => {
-        const map: Record<string, { title: string; icon: string; kind: string; ref: string }> = {
+        const map: Record<string, { title: string; icon: string; kind: 'entity' | 'timeline' | 'drafts' | 'doc' | 'module' | 'start' | 'outline' | 'simulation' | 'ttrpg'; ref: string }> = {
           material: { title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' },
           entity: { title: '实体库', icon: 'entities', kind: 'module', ref: 'entities' },
           outline: { title: '全局大纲', icon: 'outline', kind: 'module', ref: 'outline' },
@@ -225,7 +228,7 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         };
         const cfg = map[String(args.module)];
         if (!cfg) return '（未知模块）';
-        try { require('../../store/uiStore').useUIStore.getState().openTab(cfg); } catch {}
+        try { useUIStore.getState().openTab(cfg); } catch {}
         return '已打开模块：' + cfg.title + '。请在打开的视图继续操作。';
       },
     },
@@ -247,8 +250,7 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         const prompt = String(args.prompt ?? '').trim();
         const referenceImage = args.referenceImage ? String(args.referenceImage) : '';
         try {
-          const ui = require('../../store/uiStore').useUIStore.getState();
-          ui.openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' });
+          useUIStore.getState().openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' });
         } catch {}
         // 预填：让物料生成器读 sessionStorage 自动填字段（含 prompt）
         const prefill = {
@@ -265,8 +267,8 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         let aiImgNote = '';
         if (prompt) {
           try {
-            const ai = require('../../utils/ai');
-            const { dataUrl } = await ai.generateImage({ prompt, refImageDataUrl: referenceImage || undefined });
+            const { generateImage: gi } = await import('../../utils/ai');
+            const { dataUrl } = await gi({ prompt, refImageDataUrl: referenceImage || undefined });
             // 用 markdown 图片标签嵌入；侧栏 sanitizeHtml 需支持 img（已支持 dataURL）
             imageMarkdown = `\n\n![AI 生成的物料图](data:image/png;base64,${dataUrl.split(',')[1] || ''})`;
             aiImgNote = '（已直接生成图像，可右键保存或继续在物料生成器中精调）';

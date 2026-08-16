@@ -3,6 +3,7 @@
 import { useAIStore, type AIModel, type EmbeddingModel, type PromptFormat } from '../store/aiStore';
 import { useAIUsageStore, type AIUsageFeature } from '../store/aiUsageStore';
 import { useWorldStore } from '../store/worldStore';
+import * as agentRegistry from '../features/agent/registry';
 import { logAI } from './aiLog';
 
 /** 多模态内容片段：纯文本 或 图片（dataURL）。Chat 格式（OpenAI 兼容）原样支持。 */
@@ -169,10 +170,8 @@ const FORMATTERS: Record<PromptFormat, (sys: string, m: AIModel, h: AIMessage[])
 /** 从注册表构造 OpenAI tools schema（动态 require 避免循环依赖与首屏开销） */
 function buildToolsPayload(opts?: { enabledTools?: string[] }): { tools?: Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }>; toolChoice?: string } {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const reg = require('../features/agent/registry');
     const wd = useWorldStore.getState().worldsData[useWorldStore.getState().current];
-    const ctx = reg.buildToolContext({ world: wd, enabled: opts?.enabledTools });
+    const ctx = agentRegistry.buildToolContext({ world: wd, enabled: opts?.enabledTools });
     if (!ctx.tools?.length) return {};
     const tools = ctx.tools.map((tp: { name: string; description: string; parameters: Record<string, unknown> }) => ({
       type: 'function' as const,
@@ -187,10 +186,8 @@ function buildToolsPayload(opts?: { enabledTools?: string[] }): { tools?: Array<
 /** 路由工具调用：返回工具文本结果 */
 async function executeToolCallByName(name: string, args: unknown): Promise<string> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const reg = require('../features/agent/registry');
     const wd = useWorldStore.getState().worldsData[useWorldStore.getState().current];
-    const ctx = reg.buildToolContext({ world: wd });
+    const ctx = agentRegistry.buildToolContext({ world: wd });
     return await ctx.callTool(name, (args as Record<string, unknown>) ?? {});
   } catch (e) {
     return '（工具执行失败：' + String(e) + '）';
