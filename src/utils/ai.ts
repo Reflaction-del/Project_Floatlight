@@ -2,6 +2,7 @@
 
 import { useAIStore, type AIModel, type EmbeddingModel, type PromptFormat } from '../store/aiStore';
 import { useAIUsageStore, type AIUsageFeature } from '../store/aiUsageStore';
+import { useWorldStore } from '../store/worldStore';
 import { logAI } from './aiLog';
 
 /** 多模态内容片段：纯文本 或 图片（dataURL）。Chat 格式（OpenAI 兼容）原样支持。 */
@@ -10,10 +11,14 @@ export type ChatContentPart =
   | { type: 'image_url'; image_url: { url: string } };
 
 export type AIMessage = {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   /** 普通对话为字符串；多模态（如带图片的 user 消息）为内容片段数组 */
   content: string | ChatContentPart[];
   thinking?: string;
+  /** OpenAI tool calling：模型返回的工具调用（含 id/name/arguments） */
+  tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
+  /** OpenAI tool calling：tool 消息对应的 tool_call_id（assistant 的 tool_calls 配对） */
+  tool_call_id?: string;
 };
 
 /** 取一条消息的纯文本（多模态时拼接 text 片段），用于计量、思维链解析、搜索等场景 */
@@ -93,6 +98,14 @@ export interface ChatStreamOpts {
   maxTokens?: number;
   /** 用于手动终止模型响应的 AbortSignal */
   signal?: AbortSignal;
+  /** P5：是否注入工具 schema 并自动路由工具调用（默认 true，让侧栏默认具备工具能力） */
+  enableTools?: boolean;
+  /** P5：模型声明要调用的工具时触发（仅通知，不阻断执行） */
+  onToolCall?: (name: string, args: unknown) => void;
+  /** P5：工具执行完返回结果时触发（向 UI 展示步骤结果） */
+  onToolResult?: (name: string, result: string) => void;
+  /** P5：启用工具时限制可用工具名集合（默认全部） */
+  enabledTools?: string[];
 }
 
 /** 格式化为 Qwen ChatML 风格：<|im_start|>system\n...<|im_end|>\n<|im_start|>user\n...<|im_end|>\n<|im_start|>assistant\n */
@@ -145,6 +158,73 @@ const FORMATTERS: Record<PromptFormat, (sys: string, m: AIModel, h: AIMessage[])
   raw: formatRaw,
 };
 
+/* ============================================================
+ * P5 工具能力增强：让侧栏 chatStream 自动具备工具调用能力
+ * ------------------------------------------------------------
+ * - buildToolsPayload：从 agent 工具注册表构造 OpenAI tools schema
+ * - executeToolCallByName：路由工具名到具体 execute
+ * - runChatTurnNonStream：跑一次非流式 chat 拿完整 assistant message（含 tool_calls）
+ * ============================================================ */
+
+/** 从注册表构造 OpenAI tools schema（动态 require 避免循环依赖与首屏开销） */
+function buildToolsPayload(opts?: { enabledTools?: string[] }): { tools?: Array<{ type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } }>; toolChoice?: string } {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const reg = require('../features/agent/registry');
+    const wd = useWorldStore.getState().worldsData[useWorldStore.getState().current];
+    const ctx = reg.buildToolContext({ world: wd, enabled: opts?.enabledTools });
+    if (!ctx.tools?.length) return {};
+    const tools = ctx.tools.map((tp: { name: string; description: string; parameters: Record<string, unknown> }) => ({
+      type: 'function' as const,
+      function: { name: tp.name, description: tp.description, parameters: tp.parameters },
+    }));
+    return { tools, toolChoice: 'auto' };
+  } catch {
+    return {};
+  }
+}
+
+/** 路由工具调用：返回工具文本结果 */
+async function executeToolCallByName(name: string, args: unknown): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const reg = require('../features/agent/registry');
+    const wd = useWorldStore.getState().worldsData[useWorldStore.getState().current];
+    const ctx = reg.buildToolContext({ world: wd });
+    return await ctx.callTool(name, (args as Record<string, unknown>) ?? {});
+  } catch (e) {
+    return '（工具执行失败：' + String(e) + '）';
+  }
+}
+
+/** 解析 tool_call 函数参数（JSON 字符串 → 对象，失败兜底空对象） */
+function parseToolArgs(s: string | undefined): Record<string, unknown> {
+  if (!s) return {};
+  try { return JSON.parse(s); } catch { return {}; }
+}
+
+/** 单次非流式 chat 返回完整 assistant message（含 tool_calls） */
+async function runChatTurnNonStream(
+  model: AIModel,
+  messages: AIMessage[],
+  extra: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<AIMessage | null> {
+  const base = model.endpoint.replace(/\/+$/, '');
+  const url = `${base}/chat/completions`;
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${model.apiKey}` };
+  const body = JSON.stringify({
+    model: model.model,
+    messages: messages.map((m) => ({ role: m.role, content: m.content, ...(m as any).tool_call_id ? { tool_call_id: (m as any).tool_call_id } : {}, ...((m as any).tool_calls ? { tool_calls: (m as any).tool_calls } : {}) })),
+    stream: false,
+    ...extra,
+  });
+  const res = await fetch(url, { method: 'POST', headers, body, signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const json: any = await res.json();
+  return json?.choices?.[0]?.message ?? null;
+}
+
 /** 流式 chat completion
  * 网络请求与 SSE 解析全部在 Web Worker 线程进行（真正的多线程），
  * 主线程仅以 requestAnimationFrame 节流、把累积的 token 批量交给 onToken，
@@ -162,7 +242,72 @@ export async function chatStream(
   const systemDefault = '你是一个专业的写作和世界观构建助手。';
   const base = model.endpoint.replace(/\/+$/, '');
   const sysDefault = opts?.systemOverride ?? systemDefault;
+  const enableTools = opts?.enableTools !== false; // 默认开启（P5）
 
+  // —— 仅 chat 格式支持 OpenAI tools schema；其余格式走老路径 ——
+  if (format === 'chat' && enableTools) {
+    try {
+      const tp = buildToolsPayload({ enabledTools: opts?.enabledTools });
+      const messages = buildMessages(model, systemDefault, history, opts?.systemOverride);
+      const baseExtra: Record<string, unknown> = {
+        max_tokens: typeof opts?.maxTokens === 'number' ? opts.maxTokens : 4096,
+        ...(typeof opts?.temperature === 'number' ? { temperature: opts.temperature } : {}),
+        ...tp,
+      };
+      // 第一轮：非流式拿完整 assistant message（用于检测 tool_calls）
+      const m1 = await runChatTurnNonStream(model, messages, baseExtra, opts?.signal);
+      if (m1?.tool_calls?.length) {
+        // —— 自动路由工具调用 ——
+        const toolMessages: AIMessage[] = [];
+        for (const tc of m1.tool_calls) {
+          const args = parseToolArgs(tc.function?.arguments);
+          try { opts?.onToolCall?.(tc.function?.name, args); } catch {}
+          const result = await executeToolCallByName(tc.function?.name, args);
+          try { opts?.onToolResult?.(tc.function?.name, result); } catch {}
+          toolMessages.push({ role: 'tool', content: result, ...({ tool_call_id: tc.id } as any) });
+        }
+        // 第二轮：流式 chat 拿最终回答
+        const followMessages = [...messages, { role: 'assistant' as const, content: m1.content || '', ...({ tool_calls: m1.tool_calls } as any) }, ...toolMessages];
+        // 流式仍走 worker（防卡主线程）：临时禁用 tools（避免再来一轮工具调用风暴）；若模型再想用工具可放开
+        return await chatStream(
+          model,
+          followMessages as any,
+          onToken, onDone, onError,
+          { ...opts, enableTools: false },
+        );
+      }
+      // 无工具调用：把第一轮整段响应作为 token 模拟流式输出（避免 stream:false 用户长时间无反馈）
+      if (m1?.content) {
+        const text = typeof m1.content === 'string' ? m1.content : contentText(m1.content);
+        if (text) {
+          // 简单分块模拟流式（按标点/换行切分），既给用户"打字中"的视觉反馈，又避免主线程卡顿
+          const chunks: string[] = [];
+          const re = /[\s\S]{1,8}/g;
+          let m: RegExpExecArray | null;
+          while ((m = re.exec(text)) !== null) chunks.push(m[0]);
+          let i = 0;
+          const tick = () => {
+            if (i >= chunks.length) { onDone(); return; }
+            onToken(chunks[i++]);
+            setTimeout(tick, 8);
+          };
+          tick();
+        } else {
+          onDone();
+        }
+      } else {
+        onError?.('模型返回为空（端点已响应但未解析出文本）');
+      }
+      return;
+    } catch (e: any) {
+      // 工具路径失败时退回老流式路径（保证基本流式可用）
+      const errMsg = String(e?.message ?? e);
+      logAI({ level: 'warn', phase: 'chat-stream', message: '工具路径失败回退老流式：' + errMsg });
+      // 不直接 return，落到下面的 runStreamInWorker
+    }
+  }
+
+  // —— 老路径：无工具 / 工具回退 ——
   let url: string;
   let bodyStr: string;
   if (format === 'chat') {
@@ -172,7 +317,6 @@ export async function chatStream(
     injectWebSearchParam(model, payload);
     bodyStr = JSON.stringify(payload);
   } else {
-    // 走 /v1/completions（兼容性模式）
     url = `${base}/completions`;
     const prompt = FORMATTERS[format](sysDefault, model, history);
     const payload: Record<string, unknown> = { model: model.model, prompt, stream: true, max_tokens: 4096 };

@@ -521,6 +521,7 @@ export function CopilotSidebar() {
     }
 
     let full = '';
+    // P5：工具调用步骤——作为 role:tool 消息插入消息流，让用户看见模型"动了手脚"
     await chatStream(
       currentModel,
       modelMsgs,
@@ -558,7 +559,24 @@ export function CopilotSidebar() {
         });
         persistChat();
       },
-      { systemOverride, temperature: task === 'idea' ? 1.05 : task === 'lore' ? 0.3 : 0.8, signal: abortRef.current.signal },
+      {
+        systemOverride,
+        temperature: task === 'idea' ? 1.05 : task === 'lore' ? 0.3 : 0.8,
+        signal: abortRef.current.signal,
+        // P5：默认启用工具（侧栏对话/续写/灵感都具备工具能力）
+        onToolCall: (name, args) => {
+          const argStr = JSON.stringify(args ?? {}, null, 0).slice(0, 160);
+          const msg: any = { role: 'tool', content: `🔧 调用工具：${name}（${argStr}）` };
+          setMsgs((p) => [...p, msg]);
+          msgsRef.current = [...msgsRef.current, msg];
+        },
+        onToolResult: (name, result) => {
+          const preview = (result ?? '').slice(0, 240);
+          const msg: any = { role: 'tool', content: `✅ ${name} 返回：${preview}${result && result.length > 240 ? '…' : ''}` };
+          setMsgs((p) => [...p, msg]);
+          msgsRef.current = [...msgsRef.current, msg];
+        },
+      },
     );
   };
 

@@ -130,6 +130,68 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
         return r.text || '（世界为空）';
       },
     },
+    {
+      // —— P5 工具能力：让侧栏模型真正能"动手"（Phase 5 扩展）——
+      name: 'app.openModule',
+      description: '打开编辑器内的功能模块：material=可视化编辑器（视觉物料生成：角色卡/插图/批量 PNG·PDF 导出）；entity=实体库；outline=全局大纲；consistency=一致性检查；simulation=角色模拟；ttrpg=跑团。当用户希望"看到/编辑"或"开始某项工作"时调用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          module: { type: 'string', enum: ['material', 'entity', 'outline', 'consistency', 'simulation', 'ttrpg'] },
+        },
+        required: ['module'],
+      },
+      execute: (args) => {
+        const map: Record<string, { title: string; icon: string; kind: string; ref: string }> = {
+          material: { title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' },
+          entity: { title: '实体库', icon: 'entities', kind: 'module', ref: 'entities' },
+          outline: { title: '全局大纲', icon: 'outline', kind: 'module', ref: 'outline' },
+          consistency: { title: '一致性检查', icon: 'consistency', kind: 'module', ref: 'consistency' },
+          simulation: { title: '角色模拟', icon: 'simulation', kind: 'module', ref: 'simulation' },
+          ttrpg: { title: '跑团', icon: 'ttrpg', kind: 'module', ref: 'ttrpg' },
+        };
+        const cfg = map[String(args.module)];
+        if (!cfg) return '（未知模块）';
+        try { require('../../store/uiStore').useUIStore.getState().openTab(cfg); } catch {}
+        return '已打开模块：' + cfg.title + '。请在打开的视图继续操作。';
+      },
+    },
+    {
+      name: 'material.create',
+      description: '创建视觉物料（角色卡/插图/海报等）。用户给出参考图 + 描述时优先调用此工具，会打开可视化编辑器并预填参数，由用户继续精调与导出。支持 image（base64 dataURL）/ prompt / category / styleId。可选参数：refEntityIds（关联实体）、referenceImage（参考图 base64）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: '生成提示词（中文描述场景/角色/构图）' },
+          category: { type: 'string', enum: ['character', 'scene', 'prop', 'logo', 'poster'], description: '物料类别（默认 character）' },
+          referenceImage: { type: 'string', description: '参考图（base64 dataURL，可选）' },
+          styleId: { type: 'string', description: '风格预设 id（可选）' },
+          refEntityIds: { type: 'array', items: { type: 'string' }, description: '关联实体 id（可选）' },
+        },
+        required: ['prompt'],
+      },
+      execute: (args) => {
+        const mod = String(args.module ?? '').toLowerCase();
+        try {
+          const ui = require('../../store/uiStore').useUIStore.getState();
+          ui.openTab({ title: '可视化编辑器', icon: 'materials', kind: 'module', ref: 'materials' });
+        } catch {}
+        // 预填参数：写到 sessionStorage 让物料生成器首次加载读取（轻量，无 store 改动）
+        const prefill = {
+          prompt: String(args.prompt ?? ''),
+          category: String(args.category ?? 'character'),
+          styleId: args.styleId ? String(args.styleId) : '',
+          referenceImage: args.referenceImage ? String(args.referenceImage) : '',
+          refEntityIds: Array.isArray(args.refEntityIds) ? args.refEntityIds.map(String) : [],
+        };
+        try { sessionStorage.setItem('fl:material:prefill', JSON.stringify(prefill)); } catch {}
+        return JSON.stringify({
+          ok: true,
+          message: '已打开可视化编辑器并预填参数。请在打开的视图调整后点击「导出 PNG/PDF」完成。建议进一步在编辑器中精调风格/排版/文本字段。',
+          prefill,
+        });
+      },
+    },
   ];
 }
 
