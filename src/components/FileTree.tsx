@@ -4,6 +4,7 @@ import { useUIStore } from '../store/uiStore';
 import { usePromptStore } from '../store/promptStore';
 import type { DocFile, TreeSelection } from '../types';
 import { IconDoc, IconFolder, IconTimeline } from './icons';
+import { findDocTitleConflict, uniqueDocTitle } from '../utils/docConflict';
 
 interface MenuState { x: number; y: number; target: 'folder' | 'file' | 'empty' }
 
@@ -61,7 +62,10 @@ export function FileTree() {
       ],
     });
     if (!v) return; if (!v.title || !v.title.trim()) { alert('名称不能为空'); return; }
-    addDoc(v.title.trim(), v.folder || preFolder);
+    const rawTitle = v.title.trim();
+    const title = uniqueDocTitle(docs, rawTitle); // 同名自动编号（对齐文件夹行为），避免内容混淆
+    addDoc(title, v.folder || preFolder);
+    if (title !== rawTitle) alert(`已存在同名文档「${rawTitle}」，已自动命名为「${title}」`);
     const created = (useWorldStore.getState().worldsData[useWorldStore.getState().current]?.docs ?? []).slice(-1)[0];
     if (created) {
       openDoc(created.id, created.title, '');
@@ -107,6 +111,10 @@ export function FileTree() {
     if (!v?.title) return;
     const trimmed = v.title.trim();
     if (sel.kind === 'doc') {
+      if (findDocTitleConflict(docs, trimmed, sel.id)) {
+        alert(`已存在同名文档「${trimmed}」，请换一个名称`);
+        return;
+      }
       renameDoc(sel.id, trimmed);
       renameTab('doc', sel.id, trimmed);
     } else if (sel.kind === 'timeline') {
