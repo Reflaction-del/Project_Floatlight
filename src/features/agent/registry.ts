@@ -131,6 +131,79 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
       },
     },
     {
+      // —— P5+ 物料配置工具：让 LLM 会"操作可视化编辑器"（配置元素/字段/风格）——
+      name: 'material.listTemplates',
+      description: '列出可视化编辑器中可用的物料模板（角色档案/员工卡/海报等）及其字段 key（field: 与 customField: 绑定）。制作/配置物料前先调用，了解可选模板与需要填写的字段。',
+      parameters: { type: 'object', properties: {} },
+      execute: () => {
+        const out: any[] = [];
+        try {
+          const builtin = require('../materials/templates/registry');
+          for (const t of builtin.MATERIAL_TEMPLATES ?? []) out.push(briefTemplate(t));
+        } catch {}
+        for (const t of ctx.world.templates ?? []) out.push(briefTemplate(t));
+        if (!out.length) return '（暂无可用模板）';
+        return '可用物料模板：' + String.fromCharCode(10) + out.map((t) => `- ${t.id} | ${t.name}（${t.category ?? '未分类'}）| 字段: ${t.fields.length ? t.fields.join(',') : '无'} | 自定义字段: ${t.customFields.length ? t.customFields.join(',') : '无'}`).join(String.fromCharCode(10));
+      },
+    },
+    {
+      name: 'material.listStyles',
+      description: '列出可视化编辑器中的风格预设（名称/主色/底色基调）。用于为物料选择视觉风格（如暗金/赛博/水墨等）。',
+      parameters: { type: 'object', properties: {} },
+      execute: () => {
+        const styles = ctx.world.styles ?? [];
+        if (!styles.length) return '（当前世界暂无自定义风格，编辑器会使用默认风格）';
+        return '可用风格：' + String.fromCharCode(10) + styles.map((st: any) => {
+          const tok = st.token ?? {};
+          const bg = tok.color?.bg ?? tok.background ?? '';
+          const accent = tok.color?.accent ?? tok.accent ?? '';
+          return `- ${st.id} | ${st.name} | 主色:${String(accent).slice(0, 12) || '默认'} 底色:${String(bg).slice(0, 12) || '默认'}`;
+        }).join(String.fromCharCode(10));
+      },
+    },
+    {
+      name: 'material.configure',
+      description: '配置可视化编辑器的物料：切换模板（templateId）、风格（styleId）、预览实体（entityId），并把字段值写入绑定实体 materialFields（模板用 {field:key} 或 {customField:key} 绑定展示）。制作物料的标准流程：先 listTemplates + listStyles 拿到 id 与字段 key，再调用本工具装配；随后提示用户在编辑器预览中查看/导出。',
+      parameters: {
+        type: 'object',
+        properties: {
+          templateId: { type: 'string', description: '目标模板 id（从 material.listTemplates 获取）' },
+          styleId: { type: 'string', description: '目标风格 id（从 material.listStyles 获取；可省略）' },
+          entityId: { type: 'string', description: '预览绑定的实体 id（提供 fields 时必须提供）' },
+          fields: { type: 'object', description: '字段 key → 值 映射（写入实体 materialFields）' },
+        },
+      },
+      execute: (args) => {
+        const ui = require('../../features/materials/store').useMaterialStore.getState();
+        const st = require('../../store/worldStore').useWorldStore.getState();
+        const wd = st.worldsData[st.current];
+        if (!wd) return '（无当前世界）';
+        const applied: string[] = [];
+        if (args.templateId) { try { ui.setActiveTemplate(String(args.templateId)); applied.push('模板=' + args.templateId); } catch {} }
+        if (args.styleId) { try { ui.setActiveStyle(String(args.styleId)); applied.push('风格=' + args.styleId); } catch {} }
+        let entName = '';
+        if (args.entityId) {
+          const ent = wd.entities?.find((e: any) => e.id === args.entityId);
+          if (ent) {
+            try { ui.setPreviewEntity(ent.id); } catch {}
+            entName = ent.name || '未命名';
+            if (args.fields && typeof args.fields === 'object') {
+              const merged = { ...(ent.materialFields ?? {}), ...Object.fromEntries(Object.entries(args.fields).map(([k, v]) => [k, String(v)])) };
+              st.updateEntity(ent.id, { materialFields: merged } as any);
+              applied.push('字段=' + Object.keys(args.fields).length + ' 个');
+            }
+          } else {
+            return JSON.stringify({ ok: false, message: '未找到实体 id：' + args.entityId + '（可先用 memory.snapshot / 检索实体 获取实体列表）' });
+          }
+        }
+        return JSON.stringify({
+          ok: true,
+          message: '已配置物料：' + (applied.join('、') || '无更改') + (entName ? '（预览实体：' + entName + '）' : '') + '。请在可视化编辑器中查看预览，确认后可直接导出 PNG/PDF。',
+          applied,
+        });
+      },
+    },
+    {
       // —— P5 工具能力：让侧栏模型真正能"动手"（Phase 5 扩展）——
       name: 'app.openModule',
       description: '打开编辑器内的功能模块：material=可视化编辑器（视觉物料生成：角色卡/插图/批量 PNG·PDF 导出）；entity=实体库；outline=全局大纲；consistency=一致性检查；simulation=角色模拟；ttrpg=跑团。当用户希望"看到/编辑"或"开始某项工作"时调用。',
@@ -221,6 +294,24 @@ function dynamicTools(ctx: ToolBuildContext): AgentToolDef[] {
  * + 动态工具（outline.get / consistency.scan / memory.snapshot）+ 插件注册表，
  * 统一经 pre→execute→post 执行链，并触发 Trace 采集回调。
  */
+/** 提取模板字段 key（field:xxx 与 customField:key），供 material.listTemplates 展示 */
+function briefTemplate(t: any): { id: string; name: string; category?: string; fields: string[]; customFields: string[] } {
+  const fields = new Set<string>();
+  const customFields = new Set<string>();
+  const walk = (bs: any[] | undefined) => {
+    for (const b of bs ?? []) {
+      const c = typeof b?.content === 'string' ? b.content : '';
+      for (const m of c.matchAll(/\{field:([\w-]+)\}/g)) fields.add(m[1]);
+      for (const m of c.matchAll(/\{customField:([\w-]+)\}/g)) customFields.add(m[1]);
+      if (b?.binding?.source === 'field') fields.add(String(b.binding.path ?? ''));
+      if (b?.binding?.source === 'customField') customFields.add(String(b.binding.path ?? ''));
+      if (b?.children?.length) walk(b.children);
+    }
+  };
+  walk(t?.blocks);
+  return { id: t?.id ?? '', name: t?.name ?? '未命名', category: t?.category, fields: [...fields], customFields: [...customFields] };
+}
+
 export function buildToolContext(ctx: ToolBuildContext): ToolContext {
   const base = makeWorldTools(ctx.world);
   const enabledSet = ctx.enabled && ctx.enabled.length ? new Set(ctx.enabled) : null;

@@ -37,4 +37,20 @@ describe('P5 工具能力 buildToolsPayload', () => {
     const t = ctx.tools.find((x) => x.name === 'app.openModule')!;
     expect((t.parameters as any).properties.module.enum).toEqual(['material', 'entity', 'outline', 'consistency', 'simulation', 'ttrpg']);
   });
+
+  it('物料配置三工具已注册（listTemplates/listStyles/configure）', async () => {
+    const ctx = buildToolContext({ world: { templates: [{ id: 't1', name: '测试卡', category: 'personnel', blocks: [{ type: 'text', content: '{field:name}' }, { type: 'text', content: '{customField:ai_bio}' }] }] } as any });
+    const names = ctx.tools.map((t) => t.name);
+    expect(names).toContain('material.listTemplates');
+    expect(names).toContain('material.listStyles');
+    expect(names).toContain('material.configure');
+    // configure 参数结构
+    const cfg = ctx.tools.find((x) => x.name === 'material.configure')!;
+    expect((cfg.parameters as any).properties.fields.type).toBe('object');
+    // listTemplates 可列出模板字段（执行走 ctx.callTool）
+    const text = await ctx.callTool('material.listTemplates', {});
+    expect(text).toContain('t1');
+    expect(text).toContain('name');
+    expect(text).toContain('ai_bio');
+  });
 });
