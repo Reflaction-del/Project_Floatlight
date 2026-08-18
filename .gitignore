@@ -7,9 +7,7 @@ yarn-error.log*
 # Build outputs
 dist/
 release/
-android/app/build/
 *.exe
-*.apk
 *.blockmap
 *.zip
 
@@ -22,10 +20,6 @@ generated-images/
 *.tmp
 *.swp
 *~
-
-# Large bundled SDKs (should not be version-controlled)
-android-sdk/
-cmdline-tools.zip
 
 # IDE / OS files
 .vscode/
@@ -52,12 +46,9 @@ venv_err.txt
 # Vite temp files
 vite.config.ts.timestamp-*
 
-# Electron / Capacitor
+# Electron
 *.app
 *.dmg
 *.deb
 *.rpm
 *.snap
-
-# Android release signing (local only, contains keystore password)
-android/keystore.properties

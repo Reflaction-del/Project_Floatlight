@@ -2,7 +2,6 @@
 // utils/versionBump.ts 纯函数单元测试
 // 守护 bump 脚本（scripts/bump-version.mjs 内联副本）的「真源」逻辑：
 //  - parseVersion / validateVersionString：版本解析与格式校验
-//  - computeVersionCode：Android versionCode 编码（含 KNOWN LIMITATION 回归标记）
 //  - isVersionHigher / validateNewVersion：升版校验（防降级/手滑）
 //  - replaceVersionInContent：文档版本串替换（边界保护）
 // ============================================================
@@ -11,7 +10,6 @@ import { describe, it, expect } from 'vitest';
 import {
   parseVersion,
   validateVersionString,
-  computeVersionCode,
   isVersionHigher,
   validateNewVersion,
   replaceVersionInContent,
@@ -66,35 +64,6 @@ describe('validateVersionString', () => {
 
   it('带 v 前缀为 false', () => {
     expect(validateVersionString('v2.2.9')).toBe(false);
-  });
-});
-
-describe('computeVersionCode', () => {
-  it('基线 2.2.8 → 20228', () => {
-    expect(computeVersionCode('2.2.8')).toBe(20228);
-  });
-
-  it('当前 2.2.9 → 20229', () => {
-    expect(computeVersionCode('2.2.9')).toBe(20229);
-  });
-
-  it('minor 跨 10：2.10.3 → 202103', () => {
-    expect(computeVersionCode('2.10.3')).toBe(202103);
-  });
-
-  it('minor 晋升：2.3.0 → 20230', () => {
-    expect(computeVersionCode('2.3.0')).toBe(20230);
-  });
-
-  it('patch 跨 10：2.2.99 → 202299', () => {
-    expect(computeVersionCode('2.2.99')).toBe(202299);
-  });
-
-  it('KNOWN LIMITATION: 2.3.0 的 versionCode < 2.2.99（跨 10 非单调）', () => {
-    // 此用例验证已知缺陷：patch 跨 10 后再升 minor，versionCode 反而变小。
-    // Android 以 versionCode 判定升级方向，此时无法升级。
-    // 进入 2.2.10+/2.3.x 规划前需改用 major*10000+minor*100+patch 并一次性跳高。
-    expect(computeVersionCode('2.3.0')).toBeLessThan(computeVersionCode('2.2.99'));
   });
 });
 
@@ -184,9 +153,5 @@ describe('replaceVersionInContent', () => {
 
   it('HTML span 替换', () => {
     expect(replaceVersionInContent('<span>v2.2.8</span>', '2.2.8', '2.2.9')).toBe('<span>v2.2.9</span>');
-  });
-
-  it('build.gradle versionName 替换', () => {
-    expect(replaceVersionInContent('versionName "2.2.9"', '2.2.9', '2.3.0')).toBe('versionName "2.3.0"');
   });
 });

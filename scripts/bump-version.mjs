@@ -4,7 +4,6 @@
 // 例：npm run version:bump -- 2.3.0
 //
 // 一处改、处处改：以 package.json 的 version 为真相源，自动同步
-//   - android/app/build.gradle 的 versionName + versionCode
 //   - README.md / AGENTS.md / docs/preview-*.html 中的版本串
 // 不自动 commit——跑完人工 git add && git commit。
 //
@@ -29,11 +28,6 @@ function parseVersion(v) {
 
 function validateVersionString(v) {
   return /^\d+\.\d+\.\d+$/.test(v);
-}
-
-function computeVersionCode(v) {
-  const [major, minor, patch] = parseVersion(v);
-  return parseInt(`20${major}${minor}${patch}`, 10);
 }
 
 function isVersionHigher(current, next) {
@@ -66,7 +60,6 @@ function replaceVersionInContent(content, oldVersion, newVersion) {
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const pkgPath = `${root}package.json`;
-const gradlePath = `${root}android/app/build.gradle`;
 const docFiles = [
   'README.md',
   'AGENTS.md',
@@ -95,14 +88,7 @@ if (!check.ok) {
 pkg.version = newVersion;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
-// 2. android/app/build.gradle：versionCode + versionName
-const newCode = computeVersionCode(newVersion);
-let gradle = readFileSync(gradlePath, 'utf-8');
-gradle = gradle.replace(/versionCode \d+/, `versionCode ${newCode}`);
-gradle = gradle.replace(/versionName "[^"]*"/, `versionName "${newVersion}"`);
-writeFileSync(gradlePath, gradle);
-
-// 3. 文档版本串替换
+// 2. 文档版本串替换
 for (const f of docFiles) {
   const content = readFileSync(f, 'utf-8');
   const next = replaceVersionInContent(content, currentVersion, newVersion);
@@ -113,7 +99,6 @@ for (const f of docFiles) {
 console.log(`✓ Version bumped: ${currentVersion} → ${newVersion}`);
 console.log('  Modified files:');
 console.log('    package.json');
-console.log('    android/app/build.gradle');
 console.log('    README.md / AGENTS.md / docs/preview-*.html');
 console.log('');
 console.log('请人工审查后提交：');

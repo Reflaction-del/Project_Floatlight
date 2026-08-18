@@ -1,7 +1,7 @@
 // ============================================================
 // utils/versionBump.ts 版本号管理纯函数（bump 脚本的「真源」）
 // 供 scripts/bump-version.mjs 内联副本参考（改此处须同步改脚本内联副本）。
-// 覆盖：版本解析/校验/比较、Android versionCode 计算、文档版本串替换。
+// 覆盖：版本解析/校验/比较、文档版本串替换。
 // ============================================================
 
 export type VersionTuple = [number, number, number];
@@ -20,18 +20,6 @@ export function parseVersion(v: string): VersionTuple {
 /** 校验字符串是否为合法 "X.Y.Z"（三段非负整数） */
 export function validateVersionString(v: string): boolean {
   return /^\d+\.\d+\.\d+$/.test(v);
-}
-
-/**
- * 按既有编码规律计算 Android versionCode：parseInt("20" + major + minor + patch)。
- * 例：2.2.8→20228、2.2.9→20229、2.10.3→202103。
- * ⚠ 已知局限：minor/patch 跨 10 时非严格单调（2.3.0=20230 < 2.2.99=202299），
- * Android 以 versionCode 判定升级方向，先发 2.2.10+ 再发 2.3.0 会无法升级。
- * 进入该区间前需改用 major*10000+minor*100+patch 并一次性跳高。
- */
-export function computeVersionCode(v: string): number {
-  const [major, minor, patch] = parseVersion(v);
-  return parseInt(`20${major}${minor}${patch}`, 10);
 }
 
 /** 语义比较：next 是否严格高于 current（逐位比较 major → minor → patch） */

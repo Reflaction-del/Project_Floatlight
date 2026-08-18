@@ -6,7 +6,7 @@
 
 已为你完成以下准备：
 
-- [x] 根目录 `.gitignore`（排除 node_modules / android-sdk / release / dist 等）
+- [x] 根目录 `.gitignore`（排除 node_modules / release / dist 等）
 - [x] `LICENSE`（MIT）
 - [x] `README.md`（更新为 v2.2.8 完整介绍）
 - [x] `docs/index.html`（项目介绍站页面）
@@ -89,7 +89,6 @@ Your site is live at https://Reflaction-del.github.io/Project_Floatlight/
 5. 将以下文件拖入上传区：
    - `release/浮光世界观编辑器_v2.2.8.exe`
    - `release/浮光世界观编辑器_v2.2.8_Setup.exe`
-   - `release/android/浮光世界观编辑器_v2.2.6.apk`
 6. 点击 **Publish release**
 
 ## 后续更新
@@ -108,7 +107,7 @@ git push
 A：检查 GitHub Pages 设置中是否选择了 `/docs` 文件夹，以及占位链接是否已替换。
 
 **Q：仓库太大 push 失败？**
-A：确认 `.gitignore` 已正确排除 `node_modules/`、`android-sdk/`、`release/`、`dist/` 等目录。如果已经误提交，需要清理 Git 历史后重新 push。
+A：确认 `.gitignore` 已正确排除 `node_modules/`、`release/`、`dist/` 等目录。如果已经误提交，需要清理 Git 历史后重新 push。
 
 **Q：想绑定自定义域名？**
 A：在仓库 Settings → Pages 下方的 Custom domain 中填写域名，并在域名 DNS 添加 CNAME 记录指向 `Reflaction-del.github.io`。同时在 `docs/` 目录下创建名为 `CNAME` 的文件，内容为你的域名。

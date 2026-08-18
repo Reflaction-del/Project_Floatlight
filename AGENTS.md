@@ -4,6 +4,10 @@
 本文件为在本仓库工作的 AI 助手提供项目背景、架构约定与工程红线。
 人工维护，请在本文件顶部追加变更，不要删除历史上下文。
 
+## 变更记录
+
+- **2026-08-18**：彻底移除 Android（Capacitor）支持——删除 `android/` 工程、Capacitor 依赖与配置、release.yml 的 build-android job；bump 脚本去除 `android/app/build.gradle` 写入（版本号仅桌面单一来源）。
+
 ## 0. CLI Agent 的测试与验证红线
 
 - **仅限 CLI agent 场景**：当以 CLI agent（如 `/claude-security` 的补丁生成等无人值守/受限环境）工作时，**不实际运行测试**，只做语法检查与逻辑核对（逐行复核变更区域、用 Node 探针验证纯函数），不执行编译/测试/启动应用；交付时如实声明「未跑编译与测试，仅语法/逻辑核对」，不声称行为经测试验证。非 CLI agent 的正常开发会话不受此限。
@@ -23,8 +27,8 @@
 ## 1. 产品定位
 
 - **是什么**：面向小说作者、游戏策划、TRPG 主持人的**世界观管理工具**。把零散灵感整合为可用产出物（实体卡、关系图、时间线、视觉物料）。
-- **形态**：Electron 桌面应用（Windows 已发布，Android 通过 Capacitor 侧载）。**不是纯网页应用**，发布站仅做静态展示，不放本体运行。
-- **当前版本**：`v2.2.9`（Win 与 Android 统一单一版本）。详见 `package.json` 的 `version` 与 `build` 段。
+- **形态**：Electron 桌面应用（Windows 已发布）。**不是纯网页应用**，发布站仅做静态展示，不放本体运行。
+- **当前版本**：`v2.2.9`（桌面统一单一版本）。详见 `package.json` 的 `version` 与 `build` 段。
 - **开源仓库**：https://github.com/Reflaction-del/Project_Floatlight
   - 介绍站（GitHub Pages）：https://Reflaction-del.github.io/Project_Floatlight/
   - 下载（GitHub Releases）：https://github.com/Reflaction-del/Project_Floatlight/releases
@@ -38,8 +42,7 @@
 | 富文本 | TipTap 2（StarterKit + Table + Image + TextStyle/Color/FontFamily + Underline + Placeholder + Suggestion） |
 | 样式 | Tailwind CSS 4（`@tailwindcss/vite`），Fluent Design System（v1.6.13+ 重构） |
 | 状态 | zustand 4 |
-| 移动端 | Capacitor 8（Android） |
-| 打包 | electron-builder 24.13.3（win: nsis + portable）；Capacitor sync 进 `android/` |
+| 打包 | electron-builder 24.13.3（win: nsis + portable） |
 
 ## 3. 目录结构（关键部分）
 
@@ -64,7 +67,6 @@ src/
 electron-main.cjs  主进程（boot 快照、material:capture/export-* 等 IPC）
 preload.cjs        contextBridge 暴露的 API
 docs/              GitHub Pages 介绍站（黑金配色，单文件零依赖）
-android/           Capacitor Android 工程（cap sync 自动重建）
 ```
 
 ## 4. 视觉物料生成器（MaterialForge）架构要点
@@ -106,12 +108,10 @@ android/           Capacitor Android 工程（cap sync 自动重建）
 ### 冲版本（用 bump 脚本，一处改处处改）
 
 发版升号统一用 `npm run version:bump -- <新版本>`（如 `2.3.0`），脚本自动同步：
-`package.json` 的 `version` → `android/app/build.gradle` 的 `versionName` + `versionCode` → `README.md` / `AGENTS.md` / `docs/preview-*.html` 中的版本串。
+`package.json` 的 `version` → `README.md` / `AGENTS.md` / `docs/preview-*.html` 中的版本串。
 跑完**人工** `git add && git commit`（脚本不自动提交）。
 
 - **真相源唯一**：`package.json` 的 `version`。`build.nsis.artifactName` / `build.portable.artifactName` 已改用 electron-builder `${version}` 宏，构建时自动填号，**无需手动改产物名**。
-- **versionCode 编码**：`parseInt("20"+主+次+补丁)`（示例：1.0.0→20100；示例用历史版本号，避免被 bump 脚本误改）。⚠ 已知局限：minor/patch 跨 10 时非严格单调（`2.3.0=20230 < 2.2.99=202299`），先发 `2.2.10+` 再发 `2.3.0` 会导致 Android 无法升级；进入该区间前需改用 `major*10000+minor*100+patch` 并一次性跳高（见 `src/utils/versionBump.ts` 的 KNOWN LIMITATION 测试）。
-- Android `cap sync` 仍**不会**自动同步版本号——但 build.gradle 已由 bump 脚本改好，`cap sync` 前先跑 bump。
 - 发版后删 `release/` 下被取代的旧版 exe/Setup/blockmap。
 
 ### 桌面构建
@@ -126,13 +126,6 @@ android/           Capacitor Android 工程（cap sync 自动重建）
 - `nsis.allowDowngrade` **不是合法属性** → 删除；高版本覆盖安装由相同 appId 自动升级。
 - **NSIS 更新安装误报"无法关闭"**：electron-builder 默认 `tasklist/find` 检测在中文进程名/路径下易误报。已用 `build/installer.nsh` 自定义 `!macro customCheckAppRunning`，安装/卸载前静默 `taskkill /f /im "${APP_EXECUTABLE_FILENAME}" /t`，并在 `package.json` 的 `nsis` 加 `"include": "build/installer.nsh"`。
 
-### Android 打包要点（Capacitor）
-
-- 流程：`npx cap sync android`（把 `dist` 同步进 `android/app/src/main/assets/public`，并重建插件目录）→ `cd android && ./gradlew assembleRelease` → 产物 `android/app/build/outputs/apk/release/app-release.apk` → 复制到 `release/android/`。
-- **安全删除 shim 拦截**：`cap sync` 会批量删生成目录（assets/public 116 文件、capacitor-cordova-android-plugins 1281 文件），触发 WorkBuddy 的 `genie-safe-delete.cjs` 报 `SAFE_DELETE_BULK_CONFIRM_REQUIRED` 而失败。该 shim 仅在 `CODEBUDDY_SESSION_ID`/`CLAUDE_SESSION_ID` 存在时拦截（见 shim 第 26-31 行）；解决：命令前 `unset CODEBUDDY_SESSION_ID CLAUDE_SESSION_ID` 重跑（仅对可重建生成产物使用）。
-- **ANDROID_HOME 中文路径**：项目内 `android-sdk/` 即完整 SDK，但 `ANDROID_HOME` 未设置且 `local.properties` 缺失（`local.properties` 以 ISO-8859-1 读取、中文路径会乱码，故不用它）。改用 `export ANDROID_HOME="D:/世界观.../android-sdk"`（正斜杠 Git Bash 路径）传给 gradlew。
-- 当前 `build.gradle` 用 `signingConfig signingConfigs.debug`（AGP 自动生成 debug keystore，产物可侧载）。`release/android/` 下有 `release-key.jks`/`release-key-new.jks` 但 build.gradle 未引用，正式分发需补 `signingConfigs.release`。
-
 ## 7. 常用命令
 
 ```bash
@@ -141,7 +134,6 @@ npm run dev                # 前端开发服务器（Vite）
 npm run build              # tsc --noEmit && vite build（发版前必须零错误）
 npm run electron:dev       # vite build + 启动 Electron 桌面
 npm run dist:win           # npm run build && electron-builder --win
-npx cap sync android       # 同步 dist 到 Android（需先 unset 安全删除 shim 环境变量）
 ```
 
 ## 8. 对外宣传文案口径（已确认）
@@ -155,5 +147,5 @@ npx cap sync android       # 同步 dist 到 Android（需先 unset 安全删除
 ## 9. Git 注意事项
 
 - 仓库已 `git init`，远程 `origin` 指向 GitHub。**推送前先 `unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy`**——本机系统代理 `127.0.0.1:10809` 未运行时会导致 push 静默失败。
-- 大目录已被 `.gitignore` 排除：`node_modules/`、`android-sdk/`（22K+文件）、`release/`、`dist/`、`generated-images/`、`.deleted-backup/`、`vite.config.ts.timestamp-*` 等。**不要**把这些目录加回跟踪。
+- 大目录已被 `.gitignore` 排除：`node_modules/`、`release/`、`dist/`、`generated-images/`、`.deleted-backup/`、`vite.config.ts.timestamp-*` 等。**不要**把这些目录加回跟踪。
 - 介绍站文件在 `docs/`，GitHub Pages 从 `main` 分支的 `/docs` 提供。

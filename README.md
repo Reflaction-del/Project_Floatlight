@@ -31,7 +31,6 @@
 支持平台：
 
 - Windows（便携版 / 安装包）
-- Android（Capacitor 侧载 APK）
 - 浏览器预览（开发模式）
 
 ## 下载
@@ -42,7 +41,6 @@
 |------|------|
 | Windows 安装包 | `浮光世界观编辑器_v2.2.9_Setup.exe` |
 | Windows 便携版 | `浮光世界观编辑器_v2.2.9.exe` |
-| Android APK | `release/android/浮光世界观编辑器_v2.2.9.apk` |
 
 > 请将上方链接替换为你的实际 GitHub Releases 地址。
 
@@ -85,7 +83,6 @@
 - **TipTap 2** — 富文本编辑器核心
 - **Tailwind CSS v4** — 原子化样式
 - **Zustand** — 轻量状态管理
-- **Capacitor 8** — Android 端封装
 
 ## 开发
 
@@ -110,21 +107,10 @@ npm run build        # 浏览器产物 -> dist/
 npm run dist:win     # Windows 安装包与便携版 -> release/
 ```
 
-### Android 构建
-
-```bash
-npx cap sync android
-cd android
-./gradlew assembleRelease
-```
-
-详细构建参数与注意事项请参阅项目内 `electron-builder.config.cjs` 与 `capacitor.config.ts`。
-
 ## 项目结构
 
 ```
 .
-├── android/              # Capacitor Android 工程
 ├── assets/               # 应用图标与静态资源
 ├── build/                # 构建辅助文件（NSIS 脚本等）
 ├── public/               # 公共资源（logo 等）
@@ -139,7 +125,6 @@ cd android
 ├── electron-main.cjs     # Electron 主进程
 ├── preload.cjs           # Electron 预加载脚本
 ├── vite.config.ts        # Vite 配置
-├── capacitor.config.ts   # Capacitor 配置
 └── docs/                 # GitHub Pages 介绍站
 ```
 

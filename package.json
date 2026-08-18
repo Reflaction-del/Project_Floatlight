@@ -19,8 +19,6 @@
     "version:bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
-    "@capacitor/android": "^8.4.2",
-    "@capacitor/core": "^8.4.2",
     "@tiptap/extension-color": "^2.27.2",
     "@tiptap/extension-font-family": "^2.27.2",
     "@tiptap/extension-image": "^2.10.0",
@@ -46,7 +44,6 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.4.2",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
