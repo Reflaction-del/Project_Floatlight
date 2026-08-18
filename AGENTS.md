@@ -6,6 +6,7 @@
 
 ## 变更记录
 
+- **2026-08-18**：根目录工程/用户文档归拢至 `dev-docs/`（AGENTS/CLAUDE/README 仍留根）。
 - **2026-08-18**：彻底移除 Android（Capacitor）支持——删除 `android/` 工程、Capacitor 依赖与配置、release.yml 的 build-android job；bump 脚本去除 `android/app/build.gradle` 写入（版本号仅桌面单一来源）。
 
 ## 0. CLI Agent 的测试与验证红线

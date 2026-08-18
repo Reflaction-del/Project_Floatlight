@@ -30,14 +30,14 @@
 - `docs/index.html`
 - `docs/404.html`
 - `docs/preview-minimal.html` / `docs/preview-glass.html` / `docs/preview-editorial.html`
-- `DEPLOY.md`
+- `dev-docs/DEPLOY.md`
 
 GitHub Pages 站点地址将是：`https://Reflaction-del.github.io/Project_Floatlight/`
 
 如果将来需要更换仓库地址，可在项目根目录执行：
 
 ```bash
-sed -i 's|Reflaction-del/Project_Floatlight|新用户名/新仓库名|g' README.md docs/*.html DEPLOY.md
+sed -i 's|Reflaction-del/Project_Floatlight|新用户名/新仓库名|g' README.md docs/*.html dev-docs/DEPLOY.md
 ```
 
 ## 第 3 步：初始化并推送代码
